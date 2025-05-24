@@ -1,0 +1,5 @@
+*.json
+*.csv
+random_run.*
+.env
+venv/
