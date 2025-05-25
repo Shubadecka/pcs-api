@@ -1,6 +1,16 @@
 # pcs-api
 Backend api for the palmer cloud storage
 
+## File Structure
+### /router
+- Holds the endpoints and fastapi logic
+- files are broken down corresponding to the section of utility in the app they provide
+
+### /src
+- holds the python logic that make the fastapi endpoints work
+- holds connection information to the postgres db
+- handles authentication logic and security checks
+
 ## Needed Endpoints
 ### Login Flow
 *GET Login*
