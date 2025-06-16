@@ -35,7 +35,7 @@ Backend api for the palmer cloud storage
 - output: whether the file was sucessfully uploaded
 
 *PUT /create-directory*
-- input: path to new directory and which other users it is shared with
+- input: path to new directory and which users have access
 - logic: creates the new directory and adds it to the list of shared directories in the 'root_directories' table and connects it to users in the 'root_directory_user_access' table.
 - output: whether the directory was created
 
@@ -75,7 +75,7 @@ Backend api for the palmer cloud storage
 - logic: checks that the user performing the action is an admin, if they are: adds/updates the row in the 'users' table given the username (removes disabled status if needed), adds a root directory with that user's username to the 'root_directories' table if needed, then updates the 'root_directories_user_access' table with the tables given, makes sure the user has access to the directory that shares their username
 - output: directories user has access to, whether user is admin
 
-*DELETE /user*
+*DELETE /user* DONE
 - input: username of user performing action, username
 - logic: checks that the user performing the action is an admin, if they are: removes all directory access for that user, deletes their chat history row from the 'chat_histories' table, and marks them as disabled in the 'user' table
 - output: whether user with username was disabled

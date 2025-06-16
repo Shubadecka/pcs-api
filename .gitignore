@@ -3,3 +3,6 @@
 random_run.*
 .env
 venv/
+hf_to_onnx.py
+onnx-models/
+*.ipynb

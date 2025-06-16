@@ -1,7 +1,7 @@
 from typing import Optional
-from psycopg2.extensions import connection  # type: ignore
+from src.psql_utils import execute_query
 
-def get_user_id(conn: connection, username: str) -> Optional[int]:
+def get_user_id(conn, username: str) -> Optional[int]:
     """
     Get a user's ID from their username.
     
@@ -17,7 +17,7 @@ def get_user_id(conn: connection, username: str) -> Optional[int]:
         FROM users 
         WHERE username = %s
     """
-    result = conn.execute(query, (username,))
+    result = execute_query(conn, query, (username,))
     if result and result[0]:
         return result[0]['user_id']
     return None

@@ -2,6 +2,9 @@ import os
 import psycopg2
 from dotenv import load_dotenv
 from typing import Optional, Any, List, Dict
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Load environment variables from .env file
 load_dotenv()
@@ -66,6 +69,6 @@ def execute_query(connection: psycopg2.extensions.connection, query: str, params
             return None
             
     except psycopg2.Error as e:
-        print(f"Error executing query: {e}")
+        logger.error(f"Error executing query: {e}")
         connection.rollback()
-        return FileNotFoundError
+        raise e

@@ -1,6 +1,8 @@
+# To run: uvicorn main:app --reload --host 0.0.0.0 --port 1442
+
 from fastapi import FastAPI  # type: ignore
 from fastapi.middleware.cors import CORSMiddleware  # type: ignore
-from router import login, file_storage, admin_tools
+from router import login, file_storage, admin_tools, llm
 
 # Create FastAPI app with base URL prefix
 app = FastAPI(
@@ -23,6 +25,7 @@ app.add_middleware(
 app.include_router(login.router, prefix="/login", tags=["Login"])
 app.include_router(file_storage.router, prefix="/files", tags=["File Storage"])
 app.include_router(admin_tools.router, prefix="/admin", tags=["Admin Tools"])
+app.include_router(llm.router, prefix="/llm", tags=["LLM"])
 
 @app.get("/")
 async def root():
