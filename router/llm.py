@@ -11,7 +11,7 @@ async def get_llm_response(request: LLMResponseRequest):
     """Gets a response from the LLM based on the conversation history."""    
     try:
         with lms.Client("localhost:1446") as client:
-            model = client.llm.model(request.model, config={"contextLength": 71000})
+            model = client.llm.model(request.model, config={"contextLength": 71000}, ttl=300)
             if request.conversation[0].role == "system":
                 sys_prompt = request.conversation[0].content
             else:
