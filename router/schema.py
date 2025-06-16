@@ -8,7 +8,7 @@ class LoginRequest(BaseModel):
     device_identifier: str
 
 class LoginResponse(BaseModel):
-    is_valid: bool
+    is_correct_password: bool
     is_admin: Optional[bool] = None
     is_device_remembered: Optional[bool] = None
     message: str
