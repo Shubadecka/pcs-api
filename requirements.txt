@@ -1,7 +1,1 @@
 uvicorn
-fastapi
-pandas
-psycopg2-binary 
-python-dotenv
-python-multipart
-lmstudio
