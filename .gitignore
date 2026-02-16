@@ -6,3 +6,5 @@ venv/
 hf_to_onnx.py
 onnx-models/
 *.ipynb
+database_structure.md
+api_contract.md
