@@ -102,6 +102,27 @@ class IPageRepository(ABC):
         ...
     
     @abstractmethod
+    async def get_all_by_user(
+        self,
+        user_id: UUID,
+        start_date: date | None = None,
+        end_date: date | None = None
+    ) -> list[dict[str, Any]]:
+        """
+        Get all pages owned by a user, optionally filtered by written date range.
+
+        Args:
+            user_id: The user's UUID
+            start_date: If provided (with end_date), only return pages whose written
+                        date range overlaps with [start_date, end_date]
+            end_date: See start_date
+
+        Returns:
+            List of page records ordered by uploaded_date descending
+        """
+        ...
+
+    @abstractmethod
     async def get_image_path(self, page_id: UUID, user_id: UUID) -> str | None:
         """
         Get the image path for a page.

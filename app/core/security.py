@@ -2,17 +2,13 @@
 
 import secrets
 import hashlib
+import bcrypt
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from jose import jwt, JWTError
-from passlib.context import CryptContext
 
 from app.core.config import settings
-
-
-# Password hashing context using bcrypt
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def generate_salt() -> str:
@@ -20,36 +16,25 @@ def generate_salt() -> str:
     return secrets.token_hex(32)
 
 
+def _prepare_password(password: str, salt: str) -> bytes:
+    """SHA-256 hash the salted password to produce a fixed 32-byte input for bcrypt.
+
+    bcrypt truncates inputs at 72 bytes. Since the stored salt alone is 64 hex
+    chars, concatenating it with the password would leave almost no room for the
+    actual password. Pre-hashing collapses the combined string to exactly 32 bytes
+    regardless of password length, while still binding the salt to the hash.
+    """
+    return hashlib.sha256(f"{password}{salt}".encode("utf-8")).digest()
+
+
 def hash_password(password: str, salt: str) -> str:
-    """
-    Hash a password with the given salt.
-    
-    Args:
-        password: The plain text password
-        salt: The salt to use for hashing
-        
-    Returns:
-        The hashed password
-    """
-    # Combine password and salt, then hash with bcrypt
-    salted_password = f"{password}{salt}"
-    return pwd_context.hash(salted_password)
+    """Hash a password with the given salt, returning a UTF-8 bcrypt string."""
+    return bcrypt.hashpw(_prepare_password(password, salt), bcrypt.gensalt()).decode("utf-8")
 
 
 def verify_password(password: str, salt: str, password_hash: str) -> bool:
-    """
-    Verify a password against a hash.
-    
-    Args:
-        password: The plain text password to verify
-        salt: The salt used when hashing
-        password_hash: The stored hash to verify against
-        
-    Returns:
-        True if the password matches, False otherwise
-    """
-    salted_password = f"{password}{salt}"
-    return pwd_context.verify(salted_password, password_hash)
+    """Verify a password against a stored bcrypt hash."""
+    return bcrypt.checkpw(_prepare_password(password, salt), password_hash.encode("utf-8"))
 
 
 def create_jwt_token(user_id: UUID, expires_delta: timedelta | None = None) -> str:

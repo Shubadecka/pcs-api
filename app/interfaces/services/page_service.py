@@ -103,6 +103,26 @@ class IPageService(ABC):
         ...
     
     @abstractmethod
+    async def get_all_pages(
+        self,
+        user_id: UUID,
+        start_date: date | None = None,
+        end_date: date | None = None
+    ) -> list[dict[str, Any]]:
+        """
+        Get all pages for a user, optionally filtered by written date range.
+
+        Args:
+            user_id: The user's UUID
+            start_date: Optional filter start date (written date)
+            end_date: Optional filter end date (written date)
+
+        Returns:
+            List of page records with full image URLs
+        """
+        ...
+
+    @abstractmethod
     def get_image_url(self, image_path: str) -> str:
         """
         Construct the full URL for an image path.

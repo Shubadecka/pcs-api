@@ -179,6 +179,28 @@ class PageService(IPageService):
             "created_at": page["created_at"],
         }
     
+    async def get_all_pages(
+        self,
+        user_id: UUID,
+        start_date: date | None = None,
+        end_date: date | None = None
+    ) -> list[dict[str, Any]]:
+        """Get all pages for a user, with optional written-date range filter."""
+        pages = await self.page_repository.get_all_by_user(user_id, start_date, end_date)
+        return [
+            {
+                "id": p["id"],
+                "image_url": self.get_image_url(p["image_path"]),
+                "uploaded_date": p["uploaded_date"],
+                "page_start_date": p["page_start_date"],
+                "page_end_date": p["page_end_date"],
+                "notes": p["notes"],
+                "page_status": p["page_status"],
+                "created_at": p["created_at"],
+            }
+            for p in pages
+        ]
+
     def get_image_url(self, image_path: str) -> str:
         """Construct the full URL for an image path."""
         base_url = f"http://{settings.api_host}:{settings.api_port}"

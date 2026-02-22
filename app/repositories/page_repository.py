@@ -138,6 +138,35 @@ class PageRepository(IPageRepository):
         result = await self.db.execute(stmt)
         return result.scalar() or False
     
+    async def get_all_by_user(
+        self,
+        user_id: UUID,
+        start_date: date | None = None,
+        end_date: date | None = None
+    ) -> list[dict[str, Any]]:
+        """Get all pages for a user, with optional written-date range overlap filter."""
+        stmt = select(
+            pages.c.id,
+            pages.c.user_id,
+            pages.c.image_path,
+            pages.c.uploaded_date,
+            pages.c.page_start_date,
+            pages.c.page_end_date,
+            pages.c.notes,
+            pages.c.page_status,
+            pages.c.created_at
+        ).where(pages.c.user_id == user_id)
+
+        if start_date and end_date:
+            stmt = stmt.where(
+                pages.c.page_start_date <= end_date,
+                pages.c.page_end_date >= start_date,
+            )
+
+        stmt = stmt.order_by(pages.c.uploaded_date.desc())
+        result = await self.db.execute(stmt)
+        return [dict(r._mapping) for r in result.fetchall()]
+
     async def get_image_path(self, page_id: UUID, user_id: UUID) -> str | None:
         """Get the image path for a page."""
         stmt = select(pages.c.image_path).where(

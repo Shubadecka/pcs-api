@@ -43,10 +43,20 @@ class Settings(BaseSettings):
     
     # File upload settings
     upload_dir: str = "./uploads"
-    max_upload_size: int = 10 * 1024 * 1024  # 10MB
+    max_upload_size: int = 50 * 1024 * 1024  # 50MB
     
     # CORS settings
     cors_origins: list[str] = ["http://localhost:5173", "http://localhost:3001"]
+
+    # Email allowlist settings
+    # Set RESTRICT_EMAIL_DOMAINS=true to enable, then list allowed domains in ALLOWED_EMAIL_DOMAINS
+    restrict_email_domains: bool = False
+    # Stored as a raw comma-separated string to avoid pydantic-settings JSON-decoding it
+    allowed_email_domains: str = ""
+
+    @property
+    def allowed_email_domains_list(self) -> list[str]:
+        return [d.strip().lower() for d in self.allowed_email_domains.split(",") if d.strip()]
     
     class Config:
         env_file = ".env"

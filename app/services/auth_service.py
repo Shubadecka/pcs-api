@@ -6,6 +6,7 @@ from typing import Any
 
 from app.interfaces.services.auth_service import IAuthService
 from app.interfaces.repositories.user_repository import IUserRepository
+from app.core.config import settings
 from app.core.security import (
     generate_salt,
     hash_password,
@@ -42,6 +43,12 @@ class AuthService(IAuthService):
         # Validate email format
         if not await self.validate_email(email):
             raise ValueError("Invalid email format")
+
+        # Enforce domain allowlist if enabled
+        if settings.restrict_email_domains:
+            domain = email.split("@", 1)[-1].lower()
+            if domain not in settings.allowed_email_domains_list:
+                raise ValueError("Registration is not open for your email domain")
         
         # Validate password
         if not await self.validate_password(password):

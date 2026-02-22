@@ -3,10 +3,10 @@
 from datetime import date
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 
 from app.core.dependencies import DbSession, CurrentUserId
-from app.schemas.page import PageResponse, SinglePageResponse
+from app.schemas.page import PageListResponse, PageResponse, SinglePageResponse
 from app.repositories.page_repository import PageRepository
 from app.services.page_service import PageService
 
@@ -74,6 +74,50 @@ async def upload_page(
             status=page["page_status"],
             createdAt=page["created_at"]
         )
+    )
+
+
+@router.get(
+    "",
+    response_model=PageListResponse,
+    summary="List all pages",
+    responses={
+        401: {"description": "Not authenticated"},
+    }
+)
+async def list_pages(
+    user_id: CurrentUserId,
+    page_service: PageService = Depends(get_page_service),
+    start_date: date | None = Query(None, alias="startDate", description="Filter start date (written date, YYYY-MM-DD)"),
+    end_date: date | None = Query(None, alias="endDate", description="Filter end date (written date, YYYY-MM-DD)"),
+):
+    """
+    List all pages for the current user.
+
+    Optionally filter by written date range using startDate and endDate.
+    Only pages whose written date range overlaps with the filter range are returned.
+    Pages without a written date (status 'pending') are excluded when a filter is active.
+    """
+    pages = await page_service.get_all_pages(
+        user_id=user_id,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    return PageListResponse(
+        pages=[
+            PageResponse(
+                id=p["id"],
+                imageUrl=p["image_url"],
+                date=p["uploaded_date"],
+                page_start_date=p["page_start_date"],
+                page_end_date=p["page_end_date"],
+                notes=p["notes"],
+                status=p["page_status"],
+                createdAt=p["created_at"],
+            )
+            for p in pages
+        ],
+        total=len(pages),
     )
 
 

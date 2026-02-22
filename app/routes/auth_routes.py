@@ -29,6 +29,7 @@ def get_auth_service(db: DbSession) -> AuthService:
     summary="Register a new user",
     responses={
         400: {"description": "Validation error or email already exists"},
+        403: {"description": "Email domain not permitted"},
     }
 )
 async def register(
@@ -49,9 +50,15 @@ async def register(
             password=request.password
         )
     except ValueError as e:
+        msg = str(e)
+        if "email domain" in msg.lower():
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={"message": msg}
+            )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"message": str(e)}
+            detail={"message": msg}
         )
     
     # Set JWT token in httpOnly cookie
