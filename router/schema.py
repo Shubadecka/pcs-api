@@ -40,7 +40,7 @@ class UploadFileResponse(BaseModel):
     success: bool
     message: str
     filename: Optional[str] = None
-    # directory: Optional[str] = None # Redundant if path is part of filename
+    transcription: Optional[str] = None
 
 class CreateDirectoryRequest(BaseModel):
     path: str # Path to the new directory (e.g., "existing_folder/new_folder_name")
