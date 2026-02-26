@@ -1,216 +1,174 @@
 # pcs-api
-Backend api for the palmer cloud storage
 
-## File Structure
-### /router
-- Holds the endpoints and fastapi logic
-- files are broken down corresponding to the section of utility in the app they provide
+Backend API for a personal journal transcription [app](https://github.com/Shubadecka/palmer-cloud-storage-js). Users upload images of handwritten journal pages, transcribe them into individual dated entries, and manage their journal archive. Will require an OCR model running on ollama for the transcription piece eventually.
 
-### /src
-- holds the python logic that make the fastapi endpoints work
-- holds connection information to the postgres db
-- handles authentication logic and security checks
+## Tech Stack
 
-## Needed Endpoints
-### Login Flow
-*GET /login*
-- input: username, password, and device identifier
-- logic: if the user is either not in the users table or is disabled, return that there is no such username. Otherwise, hashes the password, and compares it to the hashed password stored in the 'users' table. If it matches, returns that the combination is valid and the rest of the imformation. Otherwise, doesn't return anything but that the combination isn't valid. If the combination is valid, also sends out an email as listed in the 'users' table and stores the validation code in the 'validation_codes' table.
-- returns: whether the username and password are valid, whether the user is an admin, and whether the device is remembered
+- **Framework:** FastAPI (Python 3.12+)
+- **Database:** PostgreSQL 16 (async via asyncpg + SQLAlchemy)
+- **Auth:** JWT tokens in httpOnly cookies
+- **File storage:** Local filesystem (`./uploads`)
+- **Server:** Uvicorn (ASGI)
 
-*GET /two-factor-auth*
-- input: a username and a string of numbers
-- logic: compares the number sent in with the number stored in the 'validation_codes' table according to user_id. If they match and the code was submitted within 5 minutes of being generated, return True. Else return false. If it matches, delete the validation_code value in the table that was matched.
-- returns: whether the user can log in
+## Getting Started
 
-### File Browser
-*GET /list-files*
-- input: path
-- logic: runs 'listdir' or a similar command to find all the files and directories in the given directory. Returns two lists, one for directories and one for files. Returns an error if the path is a file.
-- output: list of files and list of directories and whether the user can share directories in this directory
+### Prerequisites
 
-*PUT /upload-file*
-- input: directory, filename, and file
-- logic: takes the file and uploads it to the directory with the filename
-- output: whether the file was sucessfully uploaded
+- Python 3.12+
+- PostgreSQL instance running (or use Docker Compose)
 
-*PUT /create-directory*
-- input: path to new directory and which users have access
-- logic: creates the new directory and adds it to the list of shared directories in the 'root_directories' table and connects it to users in the 'root_directory_user_access' table.
-- output: whether the directory was created
+### Local setup
 
-*GET /download-file*
-- input: path
-- logic: returns the file if it exists. If it doesn't exist or is a directory, returns an error message to that effect.
-- output: file
+```bash
+# Clone and enter the project
+git clone <repo-url>
+cd pcs-api
 
-*GET /download-directory*
-- input: path
-- logic: returns the directory as a zipped file. returns an error if it doesn't exist or is a file.
-- output: zipped directory
+# Create and activate a virtual environment
+python -m venv .venv
+source .venv/bin/activate
 
-*DELETE /file*
-- input: path
-- logic: moves the file to /media/tim/nautishub_cloud/palmer_server/storage_folder/deleted_files and returns whether the action was sucessful
-- output: whether the file was sucessfully moved
+# Install dependencies
+pip install -r requirements.txt
 
-*DELETE /directory*
-- input: path
-- logic: moves the directory to /media/tim/nautishub_cloud/palmer_server/storage_folder/deleted_files and returns whether the action was sucessful
-- output: whether the directory was sucessfully moved
+# Copy and configure environment variables
+cp .env.example .env
+# Edit .env with your database credentials and JWT secret
 
-### LLM
-*GET /response*
-- input: user_id, user conversation so far, model to query
-- logic: checks that the input conversation ends with a user message, then calls POST localhost:1440/v1/chat/completions with the entire conversation history, returns the result of that call. updates the user's row in the 'conversation_histories' table.
-- output: LLM's next response
+# Start the server
+uvicorn main:app --reload --host 0.0.0.0 --port 1442
+```
 
-### Admin Tools
-*GET /user*
-- input: username of user performing action, username
-- logic: checks that the user performing the action is an admin, if they are: returns the username given, that user's directories they have access to, whether they are an admin, and whether they are disabled
+The API will be available at `http://localhost:1442`.  
+Interactive docs: `http://localhost:1442/docs`
 
-*POST /user*
-- input: username of user performing action, username, password, extra directories to give access to, directories to remove access to, whether user is admin
-- logic: checks that the user performing the action is an admin, if they are: adds/updates the row in the 'users' table given the username (removes disabled status if needed), adds a root directory with that user's username to the 'root_directories' table if needed, then updates the 'root_directories_user_access' table with the tables given, makes sure the user has access to the directory that shares their username
-- output: directories user has access to, whether user is admin
+### Docker Compose
 
-*DELETE /user* DONE
-- input: username of user performing action, username
-- logic: checks that the user performing the action is an admin, if they are: removes all directory access for that user, deletes their chat history row from the 'chat_histories' table, and marks them as disabled in the 'user' table
-- output: whether user with username was disabled
+```bash
+docker-compose up --build
+```
 
-## Database Structure
-db_name: palmer_server
-user: tim
-password: in .env file as PG_PASSWORD
-host: /var/run/postgresql
-port: 5432
+This starts both the API and a PostgreSQL container. Ports:
+- API: `localhost:1442`
+- PostgreSQL: `localhost:1456`
 
-### palmer_server
-*users*
-- user_id: int, PK
-- username: varchar\[max], NOT NULL
-- email: varchar\[max], NOT NULL
-- hashed_pass: varchar\[max], NOT NULL
-- is_admin: bit, NOT NULL
-- is_active: bit, NOT NULL
-- row_created_datetime_utc: datetime\[64], NOT NULL
-- row_modified_datetime_utc: datetime\[64], NULL
+### Running tests
 
-*root_directories*
-- directory_id: int, PK, NOT NULL
-- directory_path: varchar\[max], NOT NULL
-- created_by_user_id: int, NULL
-- row_created_datetime_utc: datetime\[64], NOT NULL
-- row_modified_datetime_utc: datetime\[64], NULL
+```bash
+pip install -r requirements-test.txt
+pytest
+```
 
-*user_root_directory_access*
-- user_root_directory_access_id: int, PK, NOT NULL
-- user_id: int, NOT NULL
-- directory_id: int, NOT NULL
-- row_created_datetime_utc: datetime\[64], NOT NULL
-- row_modified_datetime_utc: datetime\[64], NULL
+## Environment Variables
 
-*devices*
-- device_id: int, PK, NOT NULL
-- incoming_device_id: varchar\[max], NOT NULL
-- device_last_connected_datetime_utc: datetime\[64], NOT NULL
-- device_remembered_datetime_utc: datetime\[64], NULL
-- row_created_datetime_utc: datetime\[64], NOT NULL
-- row_modified_datetime_utc: datetime\[64], NULL
+| Variable | Default | Description |
+|---|---|---|
+| `DATABASE_HOST` | `localhost` | PostgreSQL host |
+| `DATABASE_PORT` | `1456` | PostgreSQL port |
+| `DATABASE_NAME` | `journal_db` | Database name |
+| `DATABASE_USER` | `postgres` | Database user |
+| `DATABASE_PASSWORD` | — | Database password |
+| `JWT_SECRET_KEY` | — | Secret key for signing JWT tokens |
+| `JWT_ALGORITHM` | `HS256` | JWT signing algorithm |
+| `JWT_EXPIRY_HOURS` | `24` | Token lifetime in hours |
+| `RESTRICT_EMAIL_DOMAINS` | `false` | Restrict registration to specific domains |
+| `ALLOWED_EMAIL_DOMAINS` | — | Comma-separated list of allowed email domains |
 
-*logins*
-- login_id: int, PK, NOT NULL
-- user_id: int, FK, NOT NULL
-- device_id: int, FK, NOT NULL
-- was_validated: binary, NULL
-- row_created_datetime_utc: datetime\[64], NOT NULL
-- row_modified_datetime_utc: datetime\[64], NULL
+## API Endpoints
 
-*validation_codes*
-- validation_codes_id: int, PK, NOT NULL
-- user_id: int, FK, NOT NULL
-- validation_code: int, NULL
-- row_created_datetime_utc: datetime\[64], NOT NULL
-- row_modified_datetime_utc: datetime\[64], NULL
+All routes are prefixed with `/api`.
 
-*chat_histories*
-- chat_history_id: int, PK, NOT NULL
-- user_id: int, FK, NOT NULL
-- chat_history: varchar\[max], NULL
-- row_created_datetime_utc: datetime\[64], NOT NULL
-- row_modified_datetime_utc: datetime\[64], NULL
+### Auth — `/api/auth`
 
--- Users Table
-CREATE TABLE users (
-    user_id SERIAL PRIMARY KEY,
-    username TEXT NOT NULL UNIQUE, -- Added UNIQUE constraint as usernames typically are
-    email TEXT NOT NULL UNIQUE,    -- Added UNIQUE constraint for emails
-    hashed_pass TEXT NOT NULL,
-    is_admin BOOLEAN NOT NULL DEFAULT FALSE,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    row_created_datetime_utc TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    row_modified_datetime_utc TIMESTAMP WITH TIME ZONE
-);
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/auth/register` | Register a new user |
+| `POST` | `/api/auth/login` | Log in (sets httpOnly cookie) |
+| `POST` | `/api/auth/logout` | Log out (clears cookie) |
+| `GET` | `/api/auth/me` | Get current user info |
 
--- Devices Table
-CREATE TABLE devices (
-    device_id SERIAL PRIMARY KEY,
-    incoming_device_id TEXT NOT NULL UNIQUE, -- Assuming this should be unique per device
-    user_id INTEGER NULL REFERENCES users(user_id), -- Added potential FK to link device to a user
-    device_last_connected_datetime_utc TIMESTAMP WITH TIME ZONE NOT NULL,
-    device_remembered_datetime_utc TIMESTAMP WITH TIME ZONE,
-    row_created_datetime_utc TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    row_modified_datetime_utc TIMESTAMP WITH TIME ZONE
-);
+### Pages — `/api/pages`
 
--- Root Directories Table
-CREATE TABLE root_directories (
-    directory_id SERIAL PRIMARY KEY,
-    directory_path TEXT NOT NULL UNIQUE, -- Directory paths should be unique
-    created_by_user_id INTEGER NULL REFERENCES users(user_id) ON DELETE SET NULL, -- FK to users
-    row_created_datetime_utc TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    row_modified_datetime_utc TIMESTAMP WITH TIME ZONE
-);
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/api/pages` | Upload a journal page image |
+| `GET` | `/api/pages` | List all pages (optional date filter) |
+| `GET` | `/api/pages/{page_id}` | Get a specific page |
+| `DELETE` | `/api/pages/{page_id}` | Delete a page and its entries |
 
--- User Root Directory Access Table
--- Junction table for many-to-many relationship between users and root_directories
-CREATE TABLE user_root_directory_access (
-    user_root_directory_access_id SERIAL PRIMARY KEY,
-    user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
-    directory_id INTEGER NOT NULL REFERENCES root_directories(directory_id) ON DELETE CASCADE,
-    row_created_datetime_utc TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    row_modified_datetime_utc TIMESTAMP WITH TIME ZONE,
-    UNIQUE (user_id, directory_id) -- Prevent duplicate access entries
-);
+### Entries — `/api/entries`
 
--- Logins Table
-CREATE TABLE logins (
-    login_id SERIAL PRIMARY KEY,
-    user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
-    device_id INTEGER NOT NULL REFERENCES devices(device_id) ON DELETE CASCADE,
-    was_validated BOOLEAN NULL, -- 'binary' interpreted as BOOLEAN
-    row_created_datetime_utc TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    row_modified_datetime_utc TIMESTAMP WITH TIME ZONE
-);
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/entries` | List all entries (date filter + pagination) |
+| `GET` | `/api/entries/{entry_id}` | Get a specific entry |
+| `PUT` | `/api/entries/{entry_id}` | Update an entry |
+| `DELETE` | `/api/entries/{entry_id}` | Delete an entry |
 
--- Validation Codes Table
-CREATE TABLE validation_codes (
-    validation_codes_id SERIAL PRIMARY KEY,
-    user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
-    validation_code INTEGER NULL, -- README says 'int', endpoint description says 'string of numbers'
-                                 -- Sticking to INTEGER based on table schema type.
-    expires_at TIMESTAMP WITH TIME ZONE NOT NULL, -- Added an expiry for codes
-    row_created_datetime_utc TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    row_modified_datetime_utc TIMESTAMP WITH TIME ZONE
-);
+### Utility
 
--- Chat Histories Table
-CREATE TABLE chat_histories (
-    chat_history_id SERIAL PRIMARY KEY,
-    user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
-    chat_history TEXT NULL,
-    row_created_datetime_utc TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    row_modified_datetime_utc TIMESTAMP WITH TIME ZONE
-);
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/` | Root / status check |
+| `GET` | `/health` | Health check |
+| `GET` | `/uploads/{filename}` | Serve uploaded images |
+
+## Database Schema
+
+```sql
+users (
+    id UUID PRIMARY KEY,
+    email TEXT UNIQUE NOT NULL,
+    username TEXT NOT NULL,
+    password_hash TEXT NOT NULL,
+    salt TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+)
+
+pages (
+    id UUID PRIMARY KEY,
+    user_id UUID REFERENCES users(id),
+    image_path TEXT NOT NULL,
+    uploaded_date DATE,
+    page_start_date DATE,
+    page_end_date DATE,
+    notes TEXT,
+    page_status TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+)
+
+entries (
+    id UUID PRIMARY KEY,
+    user_id UUID REFERENCES users(id),
+    page_id UUID REFERENCES pages(id),
+    entry_date DATE,
+    transcription TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+)
+```
+
+## Project Structure
+
+```
+pcs-api/
+├── app/
+│   ├── core/           # Config, database, dependencies, models, security
+│   ├── interfaces/     # Repository and service interface definitions
+│   ├── repositories/   # Database access implementations
+│   ├── routes/         # FastAPI route handlers (auth, entries, pages)
+│   ├── schemas/        # Pydantic request/response models
+│   └── services/       # Business logic (auth, entries, pages)
+├── docker/             # PostgreSQL init scripts
+├── tests/              # Pytest test suite
+├── main.py             # Application entry point
+├── Dockerfile
+├── Dockerfile.postgres
+├── docker-compose.yml
+├── requirements.txt
+└── requirements-test.txt
+```
+
+## Authentication
+
+Passwords are hashed with bcrypt (with SHA-256 pre-hashing and a per-user salt). Authentication uses JWT tokens stored in httpOnly, SameSite=lax cookies — the frontend never touches the token directly.

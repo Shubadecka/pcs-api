@@ -24,7 +24,7 @@ from src.file_utils import get_safe_path, sanitize_filename, dir_is_root, BASE_S
 OLLAMA_PORT = os.getenv("OLLAMA_PORT", "11434")
 OCR_MODEL = os.getenv("OCR_MODEL", "")
 
-IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tiff", ".tif"}
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png"}
 
 async def transcribe_image(file_path: Path) -> Optional[str]:
     """Send an image to the local Ollama instance for OCR transcription."""

@@ -1,8 +1,33 @@
-uvicorn
-fastapi
-pandas
-psycopg2-binary 
-python-dotenv
-python-multipart
-lmstudio
-httpx
+# FastAPI framework
+fastapi>=0.109.0
+
+# ASGI server
+uvicorn[standard]>=0.27.0
+
+# PostgreSQL async driver
+asyncpg>=0.29.0
+
+# SQLAlchemy ORM with async support
+sqlalchemy[asyncio]>=2.0.25
+
+# Pydantic for data validation
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+
+# Email validation for Pydantic
+email-validator>=2.1.0
+
+# JWT authentication
+python-jose[cryptography]>=3.3.0
+
+# Password hashing
+bcrypt>=4.0.0
+
+# File upload handling
+python-multipart>=0.0.6
+
+# Async file operations
+aiofiles>=23.2.1
+
+# Environment variable loading
+python-dotenv>=1.0.0
