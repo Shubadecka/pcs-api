@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 from app.core.dependencies import DbSession, CurrentUserId
 from app.schemas.page import PageListResponse, PageResponse, SinglePageResponse
 from app.repositories.page_repository import PageRepository
+from app.repositories.entry_repository import EntryRepository
 from app.services.page_service import PageService
 
 
@@ -17,7 +18,8 @@ router = APIRouter(prefix="/pages", tags=["Pages"])
 def get_page_service(db: DbSession) -> PageService:
     """Dependency to get PageService with repositories."""
     page_repo = PageRepository(db)
-    return PageService(page_repo)
+    entry_repo = EntryRepository(db)
+    return PageService(page_repo, entry_repo)
 
 
 @router.post(

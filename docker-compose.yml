@@ -33,6 +33,11 @@ services:
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
       JWT_EXPIRY_HOURS: ${JWT_EXPIRY_HOURS:-24}
+      OLLAMA_HOST: ${OLLAMA_HOST:-host.docker.internal}
+      OLLAMA_PORT: ${OLLAMA_PORT:-11434}
+      OCR_MODEL: ${OCR_MODEL:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - journal_uploads:/app/uploads
 

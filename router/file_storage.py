@@ -1,14 +1,10 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends, Response
 from typing import List, Optional
-import shutil
+import shutil # For file operations like saving uploaded files
 import zipfile
 import io
-import base64
-import os
 from pathlib import Path
 from datetime import datetime
-
-import httpx
 
 from .schema import (
     ListFilesResponse, FileItem,
@@ -20,35 +16,6 @@ from .schema import (
 from src.psql_utils import get_db_connection, execute_query, close_db_connection
 from src.utils import get_user_id
 from src.file_utils import get_safe_path, sanitize_filename, dir_is_root, BASE_STORAGE_PATH
-
-OLLAMA_PORT = os.getenv("OLLAMA_PORT", "11434")
-OCR_MODEL = os.getenv("OCR_MODEL", "")
-
-IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png"}
-
-async def transcribe_image(file_path: Path) -> Optional[str]:
-    """Send an image to the local Ollama instance for OCR transcription."""
-    if not OCR_MODEL:
-        return None
-
-    image_data = base64.b64encode(file_path.read_bytes()).decode("utf-8")
-    payload = {
-        "model": OCR_MODEL,
-        "prompt": "Transcribe all text visible in this image exactly as written. Output only the transcribed text with no commentary.",
-        "images": [image_data],
-        "stream": False,
-    }
-
-    try:
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            response = await client.post(
-                f"http://localhost:{OLLAMA_PORT}/api/generate",
-                json=payload,
-            )
-            response.raise_for_status()
-            return response.json().get("response", "").strip()
-    except Exception:
-        return None
 
 router = APIRouter()
 
@@ -93,18 +60,15 @@ async def upload_file(directory: str = Form(...), file: UploadFile = File(...)):
             # Handle file overwrite or return error, e.g.:
             raise HTTPException(status_code=409, detail=f"File '{file_name}' already exists in the directory.")
 
+        # Save the file
+        # Using shutil.copyfileobj for potentially large files
         with file_path.open("wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        transcription = None
-        if file_path.suffix.lower() in IMAGE_EXTENSIONS:
-            transcription = await transcribe_image(file_path)
-
         return UploadFileResponse(
-            success=True,
-            message="File uploaded successfully",
-            filename=file_name,
-            transcription=transcription,
+            success=True, 
+            message="File uploaded successfully", 
+            filename=file_name
         )
     except HTTPException as http_exc:
         raise http_exc

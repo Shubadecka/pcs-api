@@ -2,33 +2,75 @@
 
 import os
 import uuid
+import base64
+import logging
 import aiofiles
 from datetime import date
 from uuid import UUID
 from typing import Any
 
+import httpx
 from fastapi import UploadFile
 
 from app.interfaces.services.page_service import IPageService
 from app.interfaces.repositories.page_repository import IPageRepository
+from app.interfaces.repositories.entry_repository import IEntryRepository
 from app.core.config import settings
+
+logger = logging.getLogger("page_service")
 
 
 # Allowed image extensions
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 
 
+async def _transcribe_image(file_path: str) -> str | None:
+    """Send a saved image to Ollama for OCR transcription.
+
+    Returns the transcribed text, or None if OCR is not configured or fails.
+    """
+    if not settings.ocr_model:
+        return None
+
+    try:
+        with open(file_path, "rb") as f:
+            image_data = base64.b64encode(f.read()).decode("utf-8")
+
+        payload = {
+            "model": settings.ocr_model,
+            "prompt": (
+                "Transcribe all text visible in this image exactly as written. "
+                "Output only the transcribed text with no commentary."
+            ),
+            "images": [image_data],
+            "stream": False,
+        }
+
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            response = await client.post(
+                f"http://{settings.ollama_host}:{settings.ollama_port}/api/generate",
+                json=payload,
+            )
+            response.raise_for_status()
+            return response.json().get("response", "").strip() or None
+    except Exception as exc:
+        logger.warning("OCR transcription failed: %s", exc)
+        return None
+
+
 class PageService(IPageService):
     """Service for page business logic."""
     
-    def __init__(self, page_repository: IPageRepository):
+    def __init__(self, page_repository: IPageRepository, entry_repository: IEntryRepository | None = None):
         """
         Initialize the service with required repositories.
         
         Args:
             page_repository: Repository for page data access
+            entry_repository: Repository for entry data access (used for auto-transcription)
         """
         self.page_repository = page_repository
+        self.entry_repository = entry_repository
     
     async def upload_page(
         self,
@@ -70,17 +112,33 @@ class PageService(IPageService):
         # Save the file
         async with aiofiles.open(file_path, "wb") as f:
             await f.write(content)
-        
+
         # Store relative path in database
         relative_path = f"{user_id}/{unique_filename}"
-        
-        # Create page record
+
+        # Create page record (status: pending)
         page = await self.page_repository.create(
             user_id=user_id,
             image_path=relative_path,
             uploaded_date=uploaded_date,
-            notes=notes
+            notes=notes,
         )
+
+        # Run OCR and, if successful, create an entry and mark the page as transcribed
+        if self.entry_repository is not None:
+            transcription = await _transcribe_image(file_path)
+            if transcription:
+                await self.entry_repository.create(
+                    user_id=user_id,
+                    page_id=page["id"],
+                    entry_date=uploaded_date,
+                    transcription=transcription,
+                )
+                page = await self.page_repository.update_status(
+                    page_id=page["id"],
+                    user_id=user_id,
+                    page_status="transcribed",
+                ) or page
         
         # Transform for API response
         return {
