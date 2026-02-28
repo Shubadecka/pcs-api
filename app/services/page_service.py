@@ -2,60 +2,28 @@
 
 import os
 import uuid
-import base64
 import logging
 import aiofiles
 from datetime import date
 from uuid import UUID
 from typing import Any
 
-import httpx
 from fastapi import UploadFile
 
 from app.interfaces.services.page_service import IPageService
 from app.interfaces.repositories.page_repository import IPageRepository
 from app.interfaces.repositories.entry_repository import IEntryRepository
 from app.core.config import settings
+from app.core.ollama_utils import ollama
+from app.services.transcription_processing import TranscriptionProcessingService
+
+_transcription_processor = TranscriptionProcessingService()
 
 logger = logging.getLogger("page_service")
 
 
 # Allowed image extensions
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
-
-
-async def _transcribe_image(file_path: str) -> str | None:
-    """Send a saved image to Ollama for OCR transcription.
-
-    Returns the transcribed text, or None if OCR is not configured or fails.
-    """
-    if not settings.ocr_model:
-        return None
-
-    try:
-        with open(file_path, "rb") as f:
-            image_data = base64.b64encode(f.read()).decode("utf-8")
-
-        payload = {
-            "model": settings.ocr_model,
-            "prompt": (
-                "Transcribe all text visible in this image exactly as written. "
-                "Output only the transcribed text with no commentary."
-            ),
-            "images": [image_data],
-            "stream": False,
-        }
-
-        async with httpx.AsyncClient(timeout=120.0) as client:
-            response = await client.post(
-                f"http://{settings.ollama_host}:{settings.ollama_port}/api/generate",
-                json=payload,
-            )
-            response.raise_for_status()
-            return response.json().get("response", "").strip() or None
-    except Exception as exc:
-        logger.warning("OCR transcription failed: %s", exc)
-        return None
 
 
 class PageService(IPageService):
@@ -124,21 +92,24 @@ class PageService(IPageService):
             notes=notes,
         )
 
-        # Run OCR and, if successful, create an entry and mark the page as transcribed
+        # Run OCR, split into dated entries, persist each one, then mark page as transcribed
         if self.entry_repository is not None:
-            transcription = await _transcribe_image(file_path)
-            if transcription:
-                await self.entry_repository.create(
-                    user_id=user_id,
-                    page_id=page["id"],
-                    entry_date=uploaded_date,
-                    transcription=transcription,
-                )
-                page = await self.page_repository.update_status(
-                    page_id=page["id"],
-                    user_id=user_id,
-                    page_status="transcribed",
-                ) or page
+            raw_text = await ollama.ocr(file_path)
+            if raw_text:
+                result = _transcription_processor.process(raw_text, uploaded_date)
+                if result and result.entries:
+                    for parsed_entry in result.entries:
+                        await self.entry_repository.create(
+                            user_id=user_id,
+                            page_id=page["id"],
+                            entry_date=parsed_entry.entry_date,
+                            transcription=parsed_entry.text,
+                        )
+                    page = await self.page_repository.update_status(
+                        page_id=page["id"],
+                        user_id=user_id,
+                        page_status="transcribed",
+                    ) or page
         
         # Transform for API response
         return {
