@@ -45,10 +45,12 @@ class Settings(BaseSettings):
     upload_dir: str = "./uploads"
     max_upload_size: int = 50 * 1024 * 1024  # 50MB
 
-    # Ollama OCR settings
+    # Ollama settings
     ollama_host: str = "host.docker.internal"
     ollama_port: int = 11434
     ocr_model: str = ""
+    response_model: str = ""
+    embedding_model: str = ""
     
     # CORS settings
     cors_origins: list[str] = ["http://localhost:5173", "http://localhost:3001"]

@@ -56,7 +56,7 @@ class TranscriptionProcessingService(ITranscriptionProcessingService):
             }
         ]
         """
-        return await ollama.generate(settings.processing_model, prompt)
+        return await ollama.generate(settings.response_model, prompt)
 
     
     async def _embed_entries(self, entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
