@@ -10,7 +10,7 @@ class ITranscriptionProcessingService(ABC):
     """Abstract base class for splitting raw OCR text into dated journal entries."""
 
     @abstractmethod
-    def process(self, raw_text: str, page_date: date) -> TranscriptionResult:
+    async def process(self, raw_text: str, page_date: date) -> TranscriptionResult:
         """
         Parse raw OCR text from a single page into one or more dated entries.
 

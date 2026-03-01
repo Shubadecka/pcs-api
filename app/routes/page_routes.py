@@ -6,7 +6,8 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 
 from app.core.dependencies import DbSession, CurrentUserId
-from app.schemas.page import PageListResponse, PageResponse, SinglePageResponse
+from app.schemas.entry import EntryResponse
+from app.schemas.page import PageListResponse, PageResponse, ProcessPageResponse, SinglePageResponse
 from app.repositories.page_repository import PageRepository
 from app.repositories.entry_repository import EntryRepository
 from app.services.page_service import PageService
@@ -162,6 +163,71 @@ async def get_page(
             status=page["page_status"],
             createdAt=page["created_at"]
         )
+    )
+
+
+@router.post(
+    "/{page_id}/process",
+    response_model=ProcessPageResponse,
+    summary="Process a page",
+    responses={
+        401: {"description": "Not authenticated"},
+        404: {"description": "Page not found"},
+        422: {"description": "OCR or transcription processing returned no results"},
+    }
+)
+async def process_page(
+    page_id: UUID,
+    user_id: CurrentUserId,
+    page_service: PageService = Depends(get_page_service)
+):
+    """
+    Run OCR and transcription processing on an existing page.
+
+    Sends the page image to the configured OCR model, splits the resulting
+    text into dated entries via the transcription processing service, and
+    saves them to the database. Any previously created entries for this page
+    are replaced. The page status is updated to 'transcribed'.
+
+    Returns the updated page and the list of created entries.
+    """
+    try:
+        result = await page_service.process_page(page_id, user_id)
+    except ValueError as e:
+        error_msg = str(e)
+        if "not found" in error_msg.lower():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail={"message": error_msg}
+            )
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"message": error_msg}
+        )
+
+    page = result["page"]
+    return ProcessPageResponse(
+        page=PageResponse(
+            id=page["id"],
+            imageUrl=page["image_url"],
+            date=page["uploaded_date"],
+            page_start_date=page["page_start_date"],
+            page_end_date=page["page_end_date"],
+            notes=page["notes"],
+            status=page["page_status"],
+            createdAt=page["created_at"],
+        ),
+        entries=[
+            EntryResponse(
+                id=e["id"],
+                date=e["entry_date"],
+                transcription=e["transcription"],
+                page_id=e["page_id"],
+                createdAt=e["created_at"],
+                updatedAt=e["updated_at"],
+            )
+            for e in result["entries"]
+        ],
     )
 
 

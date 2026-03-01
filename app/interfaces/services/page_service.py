@@ -37,6 +37,27 @@ class IPageService(ABC):
         ...
     
     @abstractmethod
+    async def process_page(
+        self,
+        page_id: UUID,
+        user_id: UUID,
+    ) -> dict[str, Any]:
+        """
+        Run OCR and transcription processing on an existing page.
+
+        Args:
+            page_id: The page's UUID
+            user_id: The user's UUID
+
+        Returns:
+            Dict with keys 'page' (page record) and 'entries' (list of created entry records)
+
+        Raises:
+            ValueError: If page not found, OCR yields nothing, or processing yields no entries
+        """
+        ...
+
+    @abstractmethod
     async def get_page(
         self,
         page_id: UUID,

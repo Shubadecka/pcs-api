@@ -122,3 +122,17 @@ class IEntryRepository(ABC):
             True if exists and owned by user, False otherwise
         """
         ...
+
+    @abstractmethod
+    async def delete_by_page_id(self, page_id: UUID, user_id: UUID) -> int:
+        """
+        Delete all entries belonging to a page.
+
+        Args:
+            page_id: The page's UUID
+            user_id: The user's UUID (ownership check on the parent page)
+
+        Returns:
+            Number of entries deleted
+        """
+        ...

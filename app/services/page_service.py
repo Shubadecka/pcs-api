@@ -96,7 +96,7 @@ class PageService(IPageService):
         if self.entry_repository is not None:
             raw_text = await ollama.ocr(file_path)
             if raw_text:
-                result = _transcription_processor.process(raw_text, uploaded_date)
+                result = await _transcription_processor.process(raw_text, uploaded_date)
                 if result and result.entries:
                     for parsed_entry in result.entries:
                         await self.entry_repository.create(
@@ -123,6 +123,73 @@ class PageService(IPageService):
             "created_at": page["created_at"],
         }
     
+    async def process_page(
+        self,
+        page_id: UUID,
+        user_id: UUID,
+    ) -> dict[str, Any]:
+        """Run OCR and transcription processing on an existing page.
+
+        Clears any existing entries for the page, creates new ones from the
+        OCR + processing pipeline, and marks the page as transcribed.
+
+        Returns a dict with keys 'page' and 'entries'.
+        Raises ValueError if the page is not found or OCR yields no text.
+        """
+        if self.entry_repository is None:
+            raise ValueError("Entry repository is required for processing")
+
+        page = await self.page_repository.get_by_id(page_id, user_id)
+        if page is None:
+            raise ValueError("Page not found")
+
+        full_path = os.path.join(settings.upload_dir, page["image_path"])
+
+        raw_text = await ollama.ocr(full_path)
+        if not raw_text:
+            raise ValueError("OCR returned no text for this page")
+
+        result = await _transcription_processor.process(raw_text, page["uploaded_date"])
+        if not result or not result.entries:
+            raise ValueError("Transcription processing returned no entries")
+
+        if page["page_status"] == "transcribed":
+            logger.warning(
+                "Page %s has already been transcribed. "
+                "New entries will be appended — delete duplicates manually if needed.",
+                page_id,
+            )
+
+        created_entries = []
+        for parsed_entry in result.entries:
+            entry = await self.entry_repository.create(
+                user_id=user_id,
+                page_id=page_id,
+                entry_date=parsed_entry.entry_date,
+                transcription=parsed_entry.transcription,
+            )
+            created_entries.append(entry)
+
+        page = await self.page_repository.update_status(
+            page_id=page_id,
+            user_id=user_id,
+            page_status="transcribed",
+        ) or page
+
+        return {
+            "page": {
+                "id": page["id"],
+                "image_url": self.get_image_url(page["image_path"]),
+                "uploaded_date": page["uploaded_date"],
+                "page_start_date": page["page_start_date"],
+                "page_end_date": page["page_end_date"],
+                "notes": page["notes"],
+                "page_status": page["page_status"],
+                "created_at": page["created_at"],
+            },
+            "entries": created_entries,
+        }
+
     async def get_page(
         self,
         page_id: UUID,
