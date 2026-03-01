@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 
 from app.core.dependencies import DbSession, CurrentUserId
 from app.schemas.entry import EntryResponse
-from app.schemas.page import PageListResponse, PageResponse, ProcessPageResponse, SinglePageResponse
+from app.schemas.page import PageListResponse, PageResponse, PageUpdateRequest, ProcessPageResponse, SinglePageResponse
 from app.repositories.page_repository import PageRepository
 from app.repositories.entry_repository import EntryRepository
 from app.services.page_service import PageService
@@ -228,6 +228,54 @@ async def process_page(
             )
             for e in result["entries"]
         ],
+    )
+
+
+@router.patch(
+    "/{page_id}",
+    response_model=SinglePageResponse,
+    summary="Update a page",
+    responses={
+        401: {"description": "Not authenticated"},
+        403: {"description": "Page belongs to another user"},
+        404: {"description": "Page not found"},
+    }
+)
+async def update_page(
+    page_id: UUID,
+    body: PageUpdateRequest,
+    user_id: CurrentUserId,
+    page_service: PageService = Depends(get_page_service)
+):
+    """
+    Update a page's start date.
+
+    Only `page_start_date` can be updated via this endpoint. This represents
+    the date of the first journal entry on the page, not the upload date.
+    """
+    try:
+        page = await page_service.update_page(
+            page_id=page_id,
+            user_id=user_id,
+            page_start_date=body.page_start_date,
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"message": str(e)}
+        )
+
+    return SinglePageResponse(
+        page=PageResponse(
+            id=page["id"],
+            imageUrl=page["image_url"],
+            date=page["uploaded_date"],
+            page_start_date=page["page_start_date"],
+            page_end_date=page["page_end_date"],
+            notes=page["notes"],
+            status=page["page_status"],
+            createdAt=page["created_at"]
+        )
     )
 
 

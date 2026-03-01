@@ -167,6 +167,36 @@ class PageRepository(IPageRepository):
         result = await self.db.execute(stmt)
         return [dict(r._mapping) for r in result.fetchall()]
 
+    async def update_dates(
+        self,
+        page_id: UUID,
+        user_id: UUID,
+        page_start_date: date | None = None,
+    ) -> dict[str, Any] | None:
+        """Update a page's start date without touching status or end date."""
+        stmt = (
+            update(pages)
+            .where(
+                pages.c.id == page_id,
+                pages.c.user_id == user_id
+            )
+            .values(page_start_date=page_start_date)
+            .returning(
+                pages.c.id,
+                pages.c.user_id,
+                pages.c.image_path,
+                pages.c.uploaded_date,
+                pages.c.page_start_date,
+                pages.c.page_end_date,
+                pages.c.notes,
+                pages.c.page_status,
+                pages.c.created_at
+            )
+        )
+        result = await self.db.execute(stmt)
+        row = result.fetchone()
+        return dict(row._mapping) if row else None
+
     async def get_image_path(self, page_id: UUID, user_id: UUID) -> str | None:
         """Get the image path for a page."""
         stmt = select(pages.c.image_path).where(

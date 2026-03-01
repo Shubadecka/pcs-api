@@ -297,6 +297,33 @@ class PageService(IPageService):
             for p in pages
         ]
 
+    async def update_page(
+        self,
+        page_id: UUID,
+        user_id: UUID,
+        page_start_date: date | None = None,
+    ) -> dict[str, Any]:
+        """Update a page's start date."""
+        page = await self.page_repository.update_dates(
+            page_id=page_id,
+            user_id=user_id,
+            page_start_date=page_start_date,
+        )
+
+        if page is None:
+            raise ValueError("Page not found")
+
+        return {
+            "id": page["id"],
+            "image_url": self.get_image_url(page["image_path"]),
+            "uploaded_date": page["uploaded_date"],
+            "page_start_date": page["page_start_date"],
+            "page_end_date": page["page_end_date"],
+            "notes": page["notes"],
+            "page_status": page["page_status"],
+            "created_at": page["created_at"],
+        }
+
     def get_image_url(self, image_path: str) -> str:
         """Construct the full URL for an image path."""
         base_url = f"http://{settings.api_host}:{settings.api_port}"

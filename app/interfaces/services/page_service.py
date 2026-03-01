@@ -144,6 +144,29 @@ class IPageService(ABC):
         ...
 
     @abstractmethod
+    async def update_page(
+        self,
+        page_id: UUID,
+        user_id: UUID,
+        page_start_date: date | None = None,
+    ) -> dict[str, Any]:
+        """
+        Update a page's start date.
+
+        Args:
+            page_id: The page's UUID
+            user_id: The user's UUID
+            page_start_date: The new start date (or None to clear it)
+
+        Returns:
+            The updated page record
+
+        Raises:
+            ValueError: If page not found or not owned by user
+        """
+        ...
+
+    @abstractmethod
     def get_image_url(self, image_path: str) -> str:
         """
         Construct the full URL for an image path.

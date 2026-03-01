@@ -67,6 +67,12 @@ class ProcessPageResponse(BaseModel):
     entries: list[EntryResponse] = Field(..., description="Entries created from this page")
 
 
+class PageUpdateRequest(BaseModel):
+    """Schema for updating a page's start date."""
+
+    page_start_date: date | None = Field(None, description="Start date of the page (first entry date)")
+
+
 class PageListResponse(BaseModel):
     """Schema for paginated page list response."""
     
