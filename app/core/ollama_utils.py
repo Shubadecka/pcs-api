@@ -44,8 +44,10 @@ class OllamaClient:
         Returns the transcribed text, or None if not configured or on failure.
         """
         if not settings.ocr_model:
+            logger.warning("OCR skipped: OCR_MODEL is not set in config")
             return None
 
+        logger.info("OCR starting for %s (model=%s)", file_path, settings.ocr_model)
         try:
             with open(file_path, "rb") as f:
                 image_data = base64.b64encode(f.read()).decode("utf-8")
@@ -57,9 +59,14 @@ class OllamaClient:
                 "stream": False,
             }
             data = await self._post("/api/generate", payload)
-            return data.get("response", "").strip() or None
+            result = data.get("response", "").strip() or None
+            if result:
+                logger.info("OCR completed for %s (%d chars)", file_path, len(result))
+            else:
+                logger.warning("OCR returned empty response for %s", file_path)
+            return result
         except Exception as exc:
-            logger.warning("OCR failed for %s: %s", file_path, exc)
+            logger.warning("OCR failed for %s: %s: %s", file_path, type(exc).__name__, exc)
             return None
 
     async def generate(self, prompt: str) -> str | None:
@@ -68,8 +75,10 @@ class OllamaClient:
         Returns the response string, or None if not configured or on failure.
         """
         if not settings.response_model:
+            logger.warning("Generate skipped: RESPONSE_MODEL is not set in config")
             return None
 
+        logger.info("Generate starting (model=%s, prompt_len=%d)", settings.response_model, len(prompt))
         try:
             payload = {
                 "model": settings.response_model,
@@ -77,9 +86,17 @@ class OllamaClient:
                 "stream": False,
             }
             data = await self._post("/api/generate", payload)
-            return data.get("response", "").strip() or None
+            result = data.get("response", "").strip() or None
+            if result:
+                logger.info("Generate completed (%d chars)", len(result))
+            else:
+                logger.warning("Generate returned empty response")
+                logger.warning(f"payload: {payload}")
+                out_response = {k: v for k, v in data.items() if k != 'context'}
+                logger.warning(f"Response: {out_response}")
+            return result
         except Exception as exc:
-            logger.warning("Generate failed: %s", exc)
+            logger.warning("Generate failed: %s: %s", type(exc).__name__, exc)
             return None
 
     async def embed(self, text: str) -> list[float] | None:
@@ -88,6 +105,7 @@ class OllamaClient:
         Returns the embedding vector, or None if not configured or on failure.
         """
         if not settings.embedding_model:
+            logger.warning("Embed skipped: EMBEDDING_MODEL is not set in config")
             return None
 
         try:
@@ -99,7 +117,7 @@ class OllamaClient:
             embeddings = data.get("embeddings", [])
             return embeddings[0] if embeddings else None
         except Exception as exc:
-            logger.warning("Embed failed: %s", exc)
+            logger.warning("Embed failed: %s: %s", type(exc).__name__, exc)
             return None
 
 

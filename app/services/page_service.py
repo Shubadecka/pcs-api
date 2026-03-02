@@ -92,25 +92,6 @@ class PageService(IPageService):
             notes=notes,
         )
 
-        # Run OCR, split into dated entries, persist each one, then mark page as transcribed
-        if self.entry_repository is not None:
-            raw_text = await ollama.ocr(file_path)
-            if raw_text:
-                result = await _transcription_processor.process(raw_text, uploaded_date)
-                if result and result.entries:
-                    for parsed_entry in result.entries:
-                        await self.entry_repository.create(
-                            user_id=user_id,
-                            page_id=page["id"],
-                            entry_date=parsed_entry.entry_date,
-                            transcription=parsed_entry.text,
-                        )
-                    page = await self.page_repository.update_status(
-                        page_id=page["id"],
-                        user_id=user_id,
-                        page_status="transcribed",
-                    ) or page
-        
         # Transform for API response
         return {
             "id": page["id"],
@@ -144,13 +125,17 @@ class PageService(IPageService):
             raise ValueError("Page not found")
 
         full_path = os.path.join(settings.upload_dir, page["image_path"])
+        logger.info("Process page starting: page_id=%s path=%s", page_id, full_path)
 
         raw_text = await ollama.ocr(full_path)
         if not raw_text:
+            logger.error("Process page failed: OCR returned no text for page_id=%s", page_id)
             raise ValueError("OCR returned no text for this page")
 
+        logger.info("OCR done for page_id=%s (%d chars), starting transcription split", page_id, len(raw_text))
         result = await _transcription_processor.process(raw_text, page["uploaded_date"])
         if not result or not result.entries:
+            logger.error("Process page failed: transcription returned no entries for page_id=%s", page_id)
             raise ValueError("Transcription processing returned no entries")
 
         if page["page_status"] == "transcribed":
@@ -176,6 +161,7 @@ class PageService(IPageService):
             page_status="transcribed",
         ) or page
 
+        logger.info("Process page completed: page_id=%s entries=%d", page_id, len(created_entries))
         return {
             "page": {
                 "id": page["id"],
