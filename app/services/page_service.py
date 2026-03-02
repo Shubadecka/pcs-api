@@ -2,6 +2,7 @@
 
 import os
 import uuid
+import logging
 import aiofiles
 from datetime import date
 from uuid import UUID
@@ -11,7 +12,14 @@ from fastapi import UploadFile
 
 from app.interfaces.services.page_service import IPageService
 from app.interfaces.repositories.page_repository import IPageRepository
+from app.interfaces.repositories.entry_repository import IEntryRepository
 from app.core.config import settings
+from app.core.ollama_utils import ollama
+from app.services.transcription_processing import TranscriptionProcessingService
+
+_transcription_processor = TranscriptionProcessingService()
+
+logger = logging.getLogger("page_service")
 
 
 # Allowed image extensions
@@ -21,14 +29,16 @@ ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 class PageService(IPageService):
     """Service for page business logic."""
     
-    def __init__(self, page_repository: IPageRepository):
+    def __init__(self, page_repository: IPageRepository, entry_repository: IEntryRepository | None = None):
         """
         Initialize the service with required repositories.
         
         Args:
             page_repository: Repository for page data access
+            entry_repository: Repository for entry data access (used for auto-transcription)
         """
         self.page_repository = page_repository
+        self.entry_repository = entry_repository
     
     async def upload_page(
         self,
@@ -70,18 +80,18 @@ class PageService(IPageService):
         # Save the file
         async with aiofiles.open(file_path, "wb") as f:
             await f.write(content)
-        
+
         # Store relative path in database
         relative_path = f"{user_id}/{unique_filename}"
-        
-        # Create page record
+
+        # Create page record (status: pending)
         page = await self.page_repository.create(
             user_id=user_id,
             image_path=relative_path,
             uploaded_date=uploaded_date,
-            notes=notes
+            notes=notes,
         )
-        
+
         # Transform for API response
         return {
             "id": page["id"],
@@ -94,6 +104,78 @@ class PageService(IPageService):
             "created_at": page["created_at"],
         }
     
+    async def process_page(
+        self,
+        page_id: UUID,
+        user_id: UUID,
+    ) -> dict[str, Any]:
+        """Run OCR and transcription processing on an existing page.
+
+        Clears any existing entries for the page, creates new ones from the
+        OCR + processing pipeline, and marks the page as transcribed.
+
+        Returns a dict with keys 'page' and 'entries'.
+        Raises ValueError if the page is not found or OCR yields no text.
+        """
+        if self.entry_repository is None:
+            raise ValueError("Entry repository is required for processing")
+
+        page = await self.page_repository.get_by_id(page_id, user_id)
+        if page is None:
+            raise ValueError("Page not found")
+
+        full_path = os.path.join(settings.upload_dir, page["image_path"])
+        logger.info("Process page starting: page_id=%s path=%s", page_id, full_path)
+
+        raw_text = await ollama.ocr(full_path)
+        if not raw_text:
+            logger.error("Process page failed: OCR returned no text for page_id=%s", page_id)
+            raise ValueError("OCR returned no text for this page")
+
+        logger.info("OCR done for page_id=%s (%d chars), starting transcription split", page_id, len(raw_text))
+        result = await _transcription_processor.process(raw_text, page["uploaded_date"])
+        if not result or not result.entries:
+            logger.error("Process page failed: transcription returned no entries for page_id=%s", page_id)
+            raise ValueError("Transcription processing returned no entries")
+
+        if page["page_status"] == "transcribed":
+            logger.warning(
+                "Page %s has already been transcribed. "
+                "New entries will be appended — delete duplicates manually if needed.",
+                page_id,
+            )
+
+        created_entries = []
+        for parsed_entry in result.entries:
+            entry = await self.entry_repository.create(
+                user_id=user_id,
+                page_id=page_id,
+                entry_date=parsed_entry.entry_date,
+                transcription=parsed_entry.transcription,
+            )
+            created_entries.append(entry)
+
+        page = await self.page_repository.update_status(
+            page_id=page_id,
+            user_id=user_id,
+            page_status="transcribed",
+        ) or page
+
+        logger.info("Process page completed: page_id=%s entries=%d", page_id, len(created_entries))
+        return {
+            "page": {
+                "id": page["id"],
+                "image_url": self.get_image_url(page["image_path"]),
+                "uploaded_date": page["uploaded_date"],
+                "page_start_date": page["page_start_date"],
+                "page_end_date": page["page_end_date"],
+                "notes": page["notes"],
+                "page_status": page["page_status"],
+                "created_at": page["created_at"],
+            },
+            "entries": created_entries,
+        }
+
     async def get_page(
         self,
         page_id: UUID,
@@ -200,6 +282,33 @@ class PageService(IPageService):
             }
             for p in pages
         ]
+
+    async def update_page(
+        self,
+        page_id: UUID,
+        user_id: UUID,
+        page_start_date: date | None = None,
+    ) -> dict[str, Any]:
+        """Update a page's start date."""
+        page = await self.page_repository.update_dates(
+            page_id=page_id,
+            user_id=user_id,
+            page_start_date=page_start_date,
+        )
+
+        if page is None:
+            raise ValueError("Page not found")
+
+        return {
+            "id": page["id"],
+            "image_url": self.get_image_url(page["image_path"]),
+            "uploaded_date": page["uploaded_date"],
+            "page_start_date": page["page_start_date"],
+            "page_end_date": page["page_end_date"],
+            "notes": page["notes"],
+            "page_status": page["page_status"],
+            "created_at": page["created_at"],
+        }
 
     def get_image_url(self, image_path: str) -> str:
         """Construct the full URL for an image path."""

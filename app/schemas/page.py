@@ -4,6 +4,8 @@ from datetime import date, datetime
 from uuid import UUID
 from pydantic import BaseModel, Field, ConfigDict
 
+from app.schemas.entry import EntryResponse
+
 
 class PageResponse(BaseModel):
     """Schema for page data in responses."""
@@ -56,6 +58,19 @@ class SinglePageResponse(BaseModel):
             }
         }
     )
+
+
+class ProcessPageResponse(BaseModel):
+    """Schema for the response after processing a page."""
+
+    page: PageResponse = Field(..., description="The updated page (status: transcribed)")
+    entries: list[EntryResponse] = Field(..., description="Entries created from this page")
+
+
+class PageUpdateRequest(BaseModel):
+    """Schema for updating a page's start date."""
+
+    page_start_date: date | None = Field(None, description="Start date of the page (first entry date)")
 
 
 class PageListResponse(BaseModel):

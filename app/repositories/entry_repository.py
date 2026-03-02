@@ -185,3 +185,12 @@ class EntryRepository(IEntryRepository):
         )
         result = await self.db.execute(stmt)
         return result.scalar() or False
+
+    async def delete_by_page_id(self, page_id: UUID, user_id: UUID) -> int:
+        """Delete all entries belonging to a page owned by the given user."""
+        stmt = delete(entries).where(
+            entries.c.page_id == page_id,
+            entries.c.user_id == user_id,
+        )
+        result = await self.db.execute(stmt)
+        return result.rowcount

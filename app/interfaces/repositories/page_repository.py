@@ -123,6 +123,26 @@ class IPageRepository(ABC):
         ...
 
     @abstractmethod
+    async def update_dates(
+        self,
+        page_id: UUID,
+        user_id: UUID,
+        page_start_date: date | None = None,
+    ) -> dict[str, Any] | None:
+        """
+        Update a page's start date without changing status or end date.
+
+        Args:
+            page_id: The page's UUID
+            user_id: The user's UUID (for ownership check)
+            page_start_date: The new start date to set (or None to clear it)
+
+        Returns:
+            The updated page record if found and owned by user, None otherwise
+        """
+        ...
+
+    @abstractmethod
     async def get_image_path(self, page_id: UUID, user_id: UUID) -> str | None:
         """
         Get the image path for a page.
