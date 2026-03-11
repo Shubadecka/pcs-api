@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.interfaces.repositories.entry_repository import IEntryRepository
 from app.core.models import entries
+from pgvector.sqlalchemy import Vector
 
 
 class EntryRepository(IEntryRepository):
@@ -59,7 +60,9 @@ class EntryRepository(IEntryRepository):
                 entries.c.user_id,
                 entries.c.page_id,
                 entries.c.entry_date,
-                entries.c.transcription,
+                entries.c.raw_ocr_transcription,
+                entries.c.improved_transcription,
+                entries.c.agent_has_improved,
                 entries.c.created_at,
                 entries.c.updated_at
             )
@@ -85,7 +88,9 @@ class EntryRepository(IEntryRepository):
             entries.c.user_id,
             entries.c.page_id,
             entries.c.entry_date,
-            entries.c.transcription,
+            entries.c.raw_ocr_transcription,
+            entries.c.improved_transcription,
+            entries.c.agent_has_improved,
             entries.c.created_at,
             entries.c.updated_at
         ).where(
@@ -102,7 +107,8 @@ class EntryRepository(IEntryRepository):
         user_id: UUID,
         page_id: UUID,
         entry_date: date,
-        transcription: str
+        raw_ocr_transcription: str,
+        embedding: list[float] | None = None,
     ) -> dict[str, Any]:
         """Create a new entry."""
         stmt = (
@@ -111,14 +117,18 @@ class EntryRepository(IEntryRepository):
                 user_id=user_id,
                 page_id=page_id,
                 entry_date=entry_date,
-                transcription=transcription
+                raw_ocr_transcription=raw_ocr_transcription,
+                embedding=embedding,
             )
             .returning(
                 entries.c.id,
                 entries.c.user_id,
                 entries.c.page_id,
                 entries.c.entry_date,
-                entries.c.transcription,
+                entries.c.raw_ocr_transcription,
+                entries.c.improved_transcription,
+                entries.c.agent_has_improved,
+                entries.c.embedding,
                 entries.c.created_at,
                 entries.c.updated_at
             )
@@ -132,7 +142,9 @@ class EntryRepository(IEntryRepository):
         entry_id: UUID,
         user_id: UUID,
         entry_date: date | None = None,
-        transcription: str | None = None
+        raw_ocr_transcription: str | None = None,
+        improved_transcription: str | None = None,
+        agent_has_improved: bool | None = None,
     ) -> dict[str, Any] | None:
         """Update an entry."""
         # Build update values dictionary
@@ -141,8 +153,14 @@ class EntryRepository(IEntryRepository):
         if entry_date is not None:
             values["entry_date"] = entry_date
         
-        if transcription is not None:
-            values["transcription"] = transcription
+        if raw_ocr_transcription is not None:
+            values["raw_ocr_transcription"] = raw_ocr_transcription
+
+        if improved_transcription is not None:
+            values["improved_transcription"] = improved_transcription
+
+        if agent_has_improved is not None:
+            values["agent_has_improved"] = agent_has_improved
         
         stmt = (
             update(entries)
@@ -156,7 +174,9 @@ class EntryRepository(IEntryRepository):
                 entries.c.user_id,
                 entries.c.page_id,
                 entries.c.entry_date,
-                entries.c.transcription,
+                entries.c.raw_ocr_transcription,
+                entries.c.improved_transcription,
+                entries.c.agent_has_improved,
                 entries.c.created_at,
                 entries.c.updated_at
             )
@@ -185,6 +205,42 @@ class EntryRepository(IEntryRepository):
         )
         result = await self.db.execute(stmt)
         return result.scalar() or False
+
+    async def search_similar(
+        self,
+        user_id: UUID,
+        query_embedding: list[float],
+        limit: int = 3,
+        exclude_entry_id: UUID | None = None,
+    ) -> list[dict[str, Any]]:
+        """Find entries closest to query_embedding using cosine distance."""
+        conditions = [
+            entries.c.user_id == user_id,
+            entries.c.embedding.isnot(None),
+        ]
+        if exclude_entry_id is not None:
+            conditions.append(entries.c.id != exclude_entry_id)
+
+        stmt = (
+            select(
+                entries.c.id,
+                entries.c.user_id,
+                entries.c.page_id,
+                entries.c.entry_date,
+                entries.c.raw_ocr_transcription,
+                entries.c.improved_transcription,
+                entries.c.agent_has_improved,
+                entries.c.created_at,
+                entries.c.updated_at,
+            )
+            .where(and_(*conditions))
+            .order_by(entries.c.embedding.cosine_distance(query_embedding))
+            .limit(limit)
+        )
+
+        result = await self.db.execute(stmt)
+        rows = result.fetchall()
+        return [dict(row._mapping) for row in rows]
 
     async def delete_by_page_id(self, page_id: UUID, user_id: UUID) -> int:
         """Delete all entries belonging to a page owned by the given user."""

@@ -2,8 +2,10 @@
 
 from typing import AsyncGenerator
 
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.pool import NullPool
+from pgvector.asyncpg import register_vector
 
 from app.core.config import settings
 
@@ -16,6 +18,12 @@ _engine = create_async_engine(
     poolclass=NullPool,  # Use NullPool for better async compatibility
 )
 
+
+@event.listens_for(_engine.sync_engine, "connect")
+def _register_vector_codec(dbapi_conn, _connection_record):
+    dbapi_conn.run_async(register_vector)
+
+
 # Create async session factory
 _async_session_factory = async_sessionmaker(
     bind=_engine,
@@ -24,6 +32,20 @@ _async_session_factory = async_sessionmaker(
     autocommit=False,
     autoflush=False,
 )
+
+
+def create_db_session() -> AsyncSession:
+    """Create a standalone database session for use outside of request context.
+
+    Returns an AsyncSession that acts as an async context manager, suitable
+    for background tasks that outlive the originating HTTP request.
+
+    Usage::
+
+        async with create_db_session() as db:
+            ...
+    """
+    return _async_session_factory()
 
 
 async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
@@ -46,11 +68,9 @@ async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
 
 async def init_db() -> None:
     """Initialize the database (create tables if needed)."""
-    # Import models to ensure they're registered with metadata
     from app.core.models import metadata
-    
+
     async with _engine.begin() as conn:
-        # Create all tables - only creates if they don't exist
         await conn.run_sync(metadata.create_all)
 
 

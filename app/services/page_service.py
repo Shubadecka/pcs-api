@@ -151,7 +151,8 @@ class PageService(IPageService):
                 user_id=user_id,
                 page_id=page_id,
                 entry_date=parsed_entry.entry_date,
-                transcription=parsed_entry.transcription,
+                raw_ocr_transcription=parsed_entry.raw_ocr_transcription,
+                embedding=parsed_entry.embedding,
             )
             created_entries.append(entry)
 

@@ -221,7 +221,9 @@ async def process_page(
             EntryResponse(
                 id=e["id"],
                 date=e["entry_date"],
-                transcription=e["transcription"],
+                raw_ocr_transcription=e["raw_ocr_transcription"],
+                improved_transcription=e["improved_transcription"],
+                agent_has_improved=e["agent_has_improved"],
                 page_id=e["page_id"],
                 createdAt=e["created_at"],
                 updatedAt=e["updated_at"],

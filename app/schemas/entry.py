@@ -10,7 +10,9 @@ class EntryResponse(BaseModel):
     
     id: UUID = Field(..., description="Entry's unique identifier")
     entry_date: date = Field(..., alias="date", description="Journal entry date")
-    transcription: str = Field(..., description="Transcribed text")
+    raw_ocr_transcription: str = Field(..., description="Raw OCR transcribed text")
+    improved_transcription: str | None = Field(None, description="Agent-improved transcription")
+    agent_has_improved: bool = Field(..., description="Whether the agent has improved the transcription")
     page_id: UUID = Field(..., description="Associated page ID")
     created_at: datetime = Field(..., alias="createdAt", description="Entry creation timestamp")
     updated_at: datetime = Field(..., alias="updatedAt", description="Last modification timestamp")
@@ -25,7 +27,9 @@ class EntryResponse(BaseModel):
             "example": {
                 "id": "123e4567-e89b-12d3-a456-426614174000",
                 "date": "2024-01-15",
-                "transcription": "Today was a wonderful day...",
+                "raw_ocr_transcription": "Today was a wonderful day...",
+                "improved_transcription": None,
+                "agent_has_improved": False,
                 "status": "transcribed",
                 "page_id": "456e4567-e89b-12d3-a456-426614174000",
                 "createdAt": "2024-01-15T12:00:00Z",
@@ -39,14 +43,17 @@ class EntryUpdate(BaseModel):
     """Schema for entry update request."""
     
     entry_date: date | None = Field(None, alias="date", description="New journal entry date")
-    transcription: str | None = Field(None, description="New transcription text")
+    raw_ocr_transcription: str | None = Field(None, description="New raw OCR transcription text")
+    improved_transcription: str | None = Field(None, description="New agent-improved transcription text")
+    agent_has_improved: bool | None = Field(None, description="Whether the agent has improved the transcription")
     
     model_config = ConfigDict(
         populate_by_name=True,
         json_schema_extra={
             "example": {
                 "date": "2024-01-16",
-                "transcription": "Updated transcription text..."
+                "raw_ocr_transcription": "Updated raw transcription text...",
+                "improved_transcription": "Updated improved transcription text..."
             }
         }
     )
@@ -65,7 +72,9 @@ class EntryListResponse(BaseModel):
                     {
                         "id": "123e4567-e89b-12d3-a456-426614174000",
                         "date": "2024-01-15",
-                        "transcription": "Today was a wonderful day...",
+                        "raw_ocr_transcription": "Today was a wonderful day...",
+                        "improved_transcription": None,
+                        "agent_has_improved": False,
                         "status": "transcribed",
                         "page_id": "456e4567-e89b-12d3-a456-426614174000",
                         "createdAt": "2024-01-15T12:00:00Z",
@@ -89,7 +98,9 @@ class SingleEntryResponse(BaseModel):
                 "entry": {
                     "id": "123e4567-e89b-12d3-a456-426614174000",
                     "date": "2024-01-15",
-                    "transcription": "Today was a wonderful day...",
+                    "raw_ocr_transcription": "Today was a wonderful day...",
+                    "improved_transcription": None,
+                    "agent_has_improved": False,
                     "status": "transcribed",
                     "page_id": "456e4567-e89b-12d3-a456-426614174000",
                     "createdAt": "2024-01-15T12:00:00Z",

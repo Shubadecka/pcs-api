@@ -1,2 +1,2 @@
-FROM postgres:16-alpine
+FROM pgvector/pgvector:pg16
 COPY docker/init.sql /docker-entrypoint-initdb.d/

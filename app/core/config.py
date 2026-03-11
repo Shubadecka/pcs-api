@@ -51,7 +51,11 @@ class Settings(BaseSettings):
     ocr_model: str = ""
     response_model: str = ""
     embedding_model: str = ""
+    embedding_dim: int = 1024
     
+    # Agentic cleanup settings
+    agent_max_iterations: int = 10
+
     # CORS settings
     cors_origins: list[str] = ["http://localhost:5173", "http://localhost:3001"]
 

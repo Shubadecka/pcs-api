@@ -82,7 +82,9 @@ def sample_entry(entry_id, user_id, page_id):
         "user_id": user_id,
         "page_id": page_id,
         "entry_date": date(2024, 1, 15),
-        "transcription": "Today was a good day.",
+        "raw_ocr_transcription": "Today was a good day.",
+        "improved_transcription": None,
+        "agent_has_improved": False,
         "created_at": now,
         "updated_at": now,
     }

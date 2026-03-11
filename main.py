@@ -13,7 +13,7 @@ from starlette.responses import Response
 
 from app.core.config import settings
 from app.core.database import init_db_pool, close_db_pool
-from app.routes import auth_router, entry_router, page_router
+from app.routes import auth_router, cleanup_router, entry_router, page_router
 
 
 logger = logging.getLogger("api")
@@ -118,6 +118,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 # Include routers under /api prefix
 app.include_router(auth_router, prefix="/api")
 app.include_router(entry_router, prefix="/api")
+app.include_router(cleanup_router, prefix="/api")
 app.include_router(page_router, prefix="/api")
 
 

@@ -99,6 +99,46 @@ class OllamaClient:
             logger.warning("Generate failed: %s: %s", type(exc).__name__, exc)
             return None
 
+    async def chat(
+        self,
+        messages: list[dict],
+        tools: list[dict] | None = None,
+    ) -> dict | None:
+        """Send a chat request to settings.response_model and return the response message.
+
+        Supports tool-calling: pass tool schemas via `tools` and inspect the
+        returned dict for `tool_calls` (tool invocation) vs `content` (plain text).
+
+        Returns the full `message` object from the response, or None if not
+        configured or on failure.
+        """
+        if not settings.response_model:
+            logger.warning("Chat skipped: RESPONSE_MODEL is not set in config")
+            return None
+
+        logger.info(
+            "Chat starting (model=%s, messages=%d)",
+            settings.response_model,
+            len(messages),
+        )
+        try:
+            payload: dict = {
+                "model": settings.response_model,
+                "messages": messages,
+                "stream": False,
+            }
+            if tools:
+                payload["tools"] = tools
+
+            data = await self._post("/api/chat", payload)
+            message = data.get("message")
+            if not message:
+                logger.warning("Chat returned no message object")
+            return message
+        except Exception as exc:
+            logger.warning("Chat failed: %s: %s", type(exc).__name__, exc)
+            return None
+
     async def embed(self, text: str) -> list[float] | None:
         """Get a vector embedding for a text string using settings.embedding_model.
 

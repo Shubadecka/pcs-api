@@ -59,7 +59,9 @@ async def get_entries(
             EntryResponse(
                 id=entry["id"],
                 date=entry["entry_date"],
-                transcription=entry["transcription"],
+                raw_ocr_transcription=entry["raw_ocr_transcription"],
+                improved_transcription=entry["improved_transcription"],
+                agent_has_improved=entry["agent_has_improved"],
                 page_id=entry["page_id"],
                 createdAt=entry["created_at"],
                 updatedAt=entry["updated_at"],
@@ -101,7 +103,9 @@ async def get_entry(
         entry=EntryResponse(
             id=entry["id"],
             date=entry["entry_date"],
-            transcription=entry["transcription"],
+            raw_ocr_transcription=entry["raw_ocr_transcription"],
+            improved_transcription=entry["improved_transcription"],
+            agent_has_improved=entry["agent_has_improved"],
             page_id=entry["page_id"],
             createdAt=entry["created_at"],
             updatedAt=entry["updated_at"],
@@ -137,7 +141,9 @@ async def update_entry(
             entry_id=entry_id,
             user_id=user_id,
             entry_date=request.entry_date,
-            transcription=request.transcription
+            raw_ocr_transcription=request.raw_ocr_transcription,
+            improved_transcription=request.improved_transcription,
+            agent_has_improved=request.agent_has_improved,
         )
     except ValueError as e:
         raise HTTPException(
@@ -149,7 +155,9 @@ async def update_entry(
         entry=EntryResponse(
             id=entry["id"],
             date=entry["entry_date"],
-            transcription=entry["transcription"],
+            raw_ocr_transcription=entry["raw_ocr_transcription"],
+            improved_transcription=entry["improved_transcription"],
+            agent_has_improved=entry["agent_has_improved"],
             page_id=entry["page_id"],
             createdAt=entry["created_at"],
             updatedAt=entry["updated_at"],

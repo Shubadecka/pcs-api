@@ -51,7 +51,9 @@ class EntryService(IEntryService):
             transformed_entries.append({
                 "id": entry["id"],
                 "entry_date": entry["entry_date"],
-                "transcription": entry["transcription"],
+                "raw_ocr_transcription": entry["raw_ocr_transcription"],
+                "improved_transcription": entry["improved_transcription"],
+                "agent_has_improved": entry["agent_has_improved"],
                 "page_id": entry["page_id"],
                 "created_at": entry["created_at"],
                 "updated_at": entry["updated_at"],
@@ -74,7 +76,9 @@ class EntryService(IEntryService):
         return {
             "id": entry["id"],
             "entry_date": entry["entry_date"],
-            "transcription": entry["transcription"],
+            "raw_ocr_transcription": entry["raw_ocr_transcription"],
+            "improved_transcription": entry["improved_transcription"],
+            "agent_has_improved": entry["agent_has_improved"],
             "page_id": entry["page_id"],
             "created_at": entry["created_at"],
             "updated_at": entry["updated_at"],
@@ -86,7 +90,9 @@ class EntryService(IEntryService):
         entry_id: UUID,
         user_id: UUID,
         entry_date: date | None = None,
-        transcription: str | None = None
+        raw_ocr_transcription: str | None = None,
+        improved_transcription: str | None = None,
+        agent_has_improved: bool | None = None,
     ) -> dict[str, Any]:
         """Update an entry."""
         # Check if entry exists and is owned by user
@@ -98,7 +104,9 @@ class EntryService(IEntryService):
             entry_id=entry_id,
             user_id=user_id,
             entry_date=entry_date,
-            transcription=transcription
+            raw_ocr_transcription=raw_ocr_transcription,
+            improved_transcription=improved_transcription,
+            agent_has_improved=agent_has_improved,
         )
         
         if entry is None:
@@ -107,7 +115,9 @@ class EntryService(IEntryService):
         return {
             "id": entry["id"],
             "entry_date": entry["entry_date"],
-            "transcription": entry["transcription"],
+            "raw_ocr_transcription": entry["raw_ocr_transcription"],
+            "improved_transcription": entry["improved_transcription"],
+            "agent_has_improved": entry["agent_has_improved"],
             "page_id": entry["page_id"],
             "created_at": entry["created_at"],
             "updated_at": entry["updated_at"],

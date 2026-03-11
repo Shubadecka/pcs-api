@@ -57,7 +57,8 @@ class IEntryRepository(ABC):
         user_id: UUID,
         page_id: UUID,
         entry_date: date,
-        transcription: str
+        raw_ocr_transcription: str,
+        embedding: list[float] | None = None,
     ) -> dict[str, Any]:
         """
         Create a new entry.
@@ -66,7 +67,8 @@ class IEntryRepository(ABC):
             user_id: The user's UUID
             page_id: The associated page's UUID
             entry_date: The journal entry date
-            transcription: The transcribed text
+            raw_ocr_transcription: The raw OCR transcribed text
+            embedding: Optional vector embedding of the transcription
             
         Returns:
             The created entry record
@@ -79,7 +81,9 @@ class IEntryRepository(ABC):
         entry_id: UUID,
         user_id: UUID,
         entry_date: date | None = None,
-        transcription: str | None = None
+        raw_ocr_transcription: str | None = None,
+        improved_transcription: str | None = None,
+        agent_has_improved: bool | None = None,
     ) -> dict[str, Any] | None:
         """
         Update an entry.
@@ -88,7 +92,9 @@ class IEntryRepository(ABC):
             entry_id: The entry's UUID
             user_id: The user's UUID (for ownership check)
             entry_date: Optional new entry date
-            transcription: Optional new transcription
+            raw_ocr_transcription: Optional new raw OCR transcription
+            improved_transcription: Optional new agent-improved transcription
+            agent_has_improved: Optional flag indicating agent improvement
             
         Returns:
             The updated entry record if found and owned by user, None otherwise
@@ -120,6 +126,28 @@ class IEntryRepository(ABC):
             
         Returns:
             True if exists and owned by user, False otherwise
+        """
+        ...
+
+    @abstractmethod
+    async def search_similar(
+        self,
+        user_id: UUID,
+        query_embedding: list[float],
+        limit: int = 3,
+        exclude_entry_id: UUID | None = None,
+    ) -> list[dict[str, Any]]:
+        """Find entries whose embeddings are closest to query_embedding.
+
+        Args:
+            user_id: The user's UUID (ownership scoping)
+            query_embedding: The query vector to compare against
+            limit: Maximum number of results to return
+            exclude_entry_id: Optional entry UUID to exclude from results
+                (used to avoid returning the entry being cleaned)
+
+        Returns:
+            List of entry records ordered by cosine similarity (most similar first)
         """
         ...
 

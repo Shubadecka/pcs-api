@@ -46,12 +46,12 @@ The raw OCR text is:
 
 Return ONLY a valid JSON array with no commentary. Each element must have exactly these two keys:
   "entry_date": the date of the entry in the format YYYY-MM-DD
-  "transcription": the full text of that entry
+  "raw_ocr_transcription": the full text of that entry
 
 Example:
 [
-  {{"entry_date": "2024-01-15", "transcription": "Today I went for a walk..."}},
-  {{"entry_date": "2024-01-16", "transcription": "Woke up early..."}}
+  {{"entry_date": "2024-01-15", "raw_ocr_transcription": "Today I went for a walk..."}},
+  {{"entry_date": "2024-01-16", "raw_ocr_transcription": "Woke up early..."}}
 ]"""
         logger.debug("Calling response model to split page (prompt_len=%d)", len(prompt))
         split_response = await ollama.generate(prompt)
@@ -74,5 +74,5 @@ Example:
     async def _embed_entries(self, entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Add a vector embedding to each entry dict."""
         for entry in entries:
-            entry["embedding"] = await ollama.embed(entry["transcription"])
+            entry["embedding"] = await ollama.embed(entry["raw_ocr_transcription"])
         return entries

@@ -1,6 +1,9 @@
 -- Enable UUID extension (required for gen_random_uuid())
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
+-- Enable pgvector extension (required for vector embeddings)
+CREATE EXTENSION IF NOT EXISTS vector;
+
 -- Drop tables if they exist (for clean setup)
 DROP TABLE IF EXISTS entries CASCADE;
 DROP TABLE IF EXISTS pages CASCADE;
@@ -52,12 +55,18 @@ CREATE INDEX idx_pages_user_page_status ON pages(user_id, page_status);
 CREATE INDEX idx_pages_user_date_range ON pages(user_id, page_start_date, page_end_date);
 
 -- Create entries table (entries only created once page has been transcribed)
+-- NOTE: embedding dimension (1024) must match the EMBEDDING_DIM env var.
+-- If you change the model/dimension, you must rebuild this container or run:
+--   ALTER TABLE entries ALTER COLUMN embedding TYPE vector(N);
 CREATE TABLE entries (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     page_id UUID NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
     entry_date DATE NOT NULL,
-    transcription TEXT NOT NULL,
+    raw_ocr_transcription TEXT NOT NULL,
+    improved_transcription TEXT NULL,
+    agent_has_improved BOOLEAN NOT NULL DEFAULT FALSE,
+    embedding vector(1024),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -80,3 +89,19 @@ CREATE TRIGGER update_entries_updated_at
     BEFORE UPDATE ON entries
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
+
+-- Create transcription_learnings table
+-- This table is used to store the learnings of the agentic loop for improving future agentic improvements to the transcription.
+-- Just a placeholder for now, will be used later.
+CREATE TABLE transcription_learnings (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    entry_id UUID NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
+    learning_date DATE NOT NULL,
+    learning_text TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_transcription_learnings_user_id ON transcription_learnings(user_id);
+CREATE INDEX idx_transcription_learnings_entry_id ON transcription_learnings(entry_id);
+CREATE INDEX idx_transcription_learnings_user_learning_date ON transcription_learnings(user_id, learning_date);

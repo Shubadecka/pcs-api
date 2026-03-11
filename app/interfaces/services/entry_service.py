@@ -60,7 +60,9 @@ class IEntryService(ABC):
         entry_id: UUID,
         user_id: UUID,
         entry_date: date | None = None,
-        transcription: str | None = None
+        raw_ocr_transcription: str | None = None,
+        improved_transcription: str | None = None,
+        agent_has_improved: bool | None = None,
     ) -> dict[str, Any]:
         """
         Update an entry.
@@ -69,7 +71,9 @@ class IEntryService(ABC):
             entry_id: The entry's UUID
             user_id: The user's UUID
             entry_date: Optional new entry date
-            transcription: Optional new transcription
+            raw_ocr_transcription: Optional new raw OCR transcription
+            improved_transcription: Optional new agent-improved transcription
+            agent_has_improved: Optional flag indicating agent improvement
             
         Returns:
             The updated entry record

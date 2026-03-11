@@ -41,7 +41,9 @@ def make_entry(entry_id: uuid.UUID, user_id: uuid.UUID, page_id: uuid.UUID) -> d
         "user_id": user_id,
         "page_id": page_id,
         "entry_date": date(2024, 1, 15),
-        "transcription": "Today was a good day.",
+        "raw_ocr_transcription": "Today was a good day.",
+        "improved_transcription": None,
+        "agent_has_improved": False,
         "created_at": now,
         "updated_at": now,
     }
@@ -125,7 +127,7 @@ class TestGetEntry:
 
         assert result["id"] == entry_id
         assert result["status"] == "transcribed"
-        assert result["transcription"] == "Today was a good day."
+        assert result["raw_ocr_transcription"] == "Today was a good day."
 
     async def test_not_found_raises(self, user_id, entry_id):
         repo = make_repo(entry=None)
@@ -142,15 +144,15 @@ class TestGetEntry:
 class TestUpdateEntry:
     async def test_successful_update(self, user_id, entry_id, page_id):
         original = make_entry(entry_id, user_id, page_id)
-        updated = {**original, "transcription": "Updated text."}
+        updated = {**original, "raw_ocr_transcription": "Updated text."}
         repo = make_repo(exists=True, updated_entry=updated)
         service = EntryService(repo)
 
         result = await service.update_entry(
-            entry_id, user_id, transcription="Updated text."
+            entry_id, user_id, raw_ocr_transcription="Updated text."
         )
 
-        assert result["transcription"] == "Updated text."
+        assert result["raw_ocr_transcription"] == "Updated text."
         assert result["status"] == "transcribed"
 
     async def test_not_found_raises(self, user_id, entry_id):
@@ -158,14 +160,14 @@ class TestUpdateEntry:
         service = EntryService(repo)
 
         with pytest.raises(ValueError, match="Entry not found"):
-            await service.update_entry(entry_id, user_id, transcription="x")
+            await service.update_entry(entry_id, user_id, raw_ocr_transcription="x")
 
     async def test_repo_returning_none_raises(self, user_id, entry_id):
         repo = make_repo(exists=True, updated_entry=None)
         service = EntryService(repo)
 
         with pytest.raises(ValueError, match="Failed to update entry"):
-            await service.update_entry(entry_id, user_id, transcription="x")
+            await service.update_entry(entry_id, user_id, raw_ocr_transcription="x")
 
     async def test_partial_update_with_date_only(self, user_id, entry_id, page_id):
         original = make_entry(entry_id, user_id, page_id)
