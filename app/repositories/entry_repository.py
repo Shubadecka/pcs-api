@@ -4,12 +4,24 @@ from datetime import date
 from uuid import UUID
 from typing import Any
 
-from sqlalchemy import select, update, delete, exists, func, and_
+from sqlalchemy import select, update, delete, exists, func, and_, cast, literal
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.interfaces.repositories.entry_repository import IEntryRepository
 from app.core.models import entries
 from pgvector.sqlalchemy import Vector
+from app.core.config import settings
+
+
+def _embedding_to_sql(embedding: list[float]) -> object:
+    """Convert a Python float list to a SQLAlchemy CAST expression for the vector type.
+
+    This bypasses the pgvector bind_processor/asyncpg codec conflict by explicitly
+    formatting the vector as a text literal and casting it in SQL, so asyncpg only
+    ever sees a plain string parameter.
+    """
+    emb_str = '[' + ','.join(str(v) for v in embedding) + ']'
+    return cast(literal(emb_str), Vector(settings.embedding_dim))
 
 
 class EntryRepository(IEntryRepository):
@@ -30,17 +42,21 @@ class EntryRepository(IEntryRepository):
         start_date: date | None = None,
         end_date: date | None = None,
         page: int = 1,
-        limit: int = 50
+        limit: int = 50,
+        sort_by: str = "entry_date",
+        filter_field: str = "entry_date",
     ) -> tuple[list[dict[str, Any]], int]:
         """Get all entries for a user with optional filtering."""
         # Build filter conditions
         conditions = [entries.c.user_id == user_id]
-        
+
+        filter_col = entries.c.created_at if filter_field == "created_at" else entries.c.entry_date
+
         if start_date is not None:
-            conditions.append(entries.c.entry_date >= start_date)
-        
+            conditions.append(filter_col >= start_date)
+
         if end_date is not None:
-            conditions.append(entries.c.entry_date <= end_date)
+            conditions.append(filter_col <= end_date)
         
         # Combine conditions with AND
         where_clause = and_(*conditions)
@@ -52,6 +68,12 @@ class EntryRepository(IEntryRepository):
         
         # Calculate offset
         offset = (page - 1) * limit
+
+        # Determine sort order
+        if sort_by == "created_at":
+            order = (entries.c.created_at.desc(), entries.c.entry_date.desc())
+        else:
+            order = (entries.c.entry_date.desc(), entries.c.created_at.desc())
         
         # Get paginated entries
         stmt = (
@@ -67,7 +89,7 @@ class EntryRepository(IEntryRepository):
                 entries.c.updated_at
             )
             .where(where_clause)
-            .order_by(entries.c.entry_date.desc(), entries.c.created_at.desc())
+            .order_by(*order)
             .limit(limit)
             .offset(offset)
         )
@@ -118,7 +140,7 @@ class EntryRepository(IEntryRepository):
                 page_id=page_id,
                 entry_date=entry_date,
                 raw_ocr_transcription=raw_ocr_transcription,
-                embedding=embedding,
+                embedding=_embedding_to_sql(embedding) if embedding is not None else None,
             )
             .returning(
                 entries.c.id,
@@ -142,19 +164,14 @@ class EntryRepository(IEntryRepository):
         entry_id: UUID,
         user_id: UUID,
         entry_date: date | None = None,
-        raw_ocr_transcription: str | None = None,
         improved_transcription: str | None = None,
         agent_has_improved: bool | None = None,
     ) -> dict[str, Any] | None:
-        """Update an entry."""
-        # Build update values dictionary
+        """Update an entry. raw_ocr_transcription is immutable and not accepted here."""
         values: dict[str, Any] = {"updated_at": func.now()}
-        
+
         if entry_date is not None:
             values["entry_date"] = entry_date
-        
-        if raw_ocr_transcription is not None:
-            values["raw_ocr_transcription"] = raw_ocr_transcription
 
         if improved_transcription is not None:
             values["improved_transcription"] = improved_transcription
@@ -234,7 +251,7 @@ class EntryRepository(IEntryRepository):
                 entries.c.updated_at,
             )
             .where(and_(*conditions))
-            .order_by(entries.c.embedding.cosine_distance(query_embedding))
+            .order_by(entries.c.embedding.cosine_distance(_embedding_to_sql(query_embedding)))
             .limit(limit)
         )
 

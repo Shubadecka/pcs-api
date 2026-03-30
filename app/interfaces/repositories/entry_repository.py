@@ -81,21 +81,23 @@ class IEntryRepository(ABC):
         entry_id: UUID,
         user_id: UUID,
         entry_date: date | None = None,
-        raw_ocr_transcription: str | None = None,
         improved_transcription: str | None = None,
         agent_has_improved: bool | None = None,
     ) -> dict[str, Any] | None:
         """
         Update an entry.
-        
+
+        `raw_ocr_transcription` is intentionally excluded — it is immutable
+        after creation. `agent_has_improved` should only be set by the agentic
+        cleanup pipeline, not by user-facing service calls.
+
         Args:
             entry_id: The entry's UUID
             user_id: The user's UUID (for ownership check)
             entry_date: Optional new entry date
-            raw_ocr_transcription: Optional new raw OCR transcription
-            improved_transcription: Optional new agent-improved transcription
-            agent_has_improved: Optional flag indicating agent improvement
-            
+            improved_transcription: Optional improved transcription text
+            agent_has_improved: Optional flag set by the agentic cleanup pipeline
+
         Returns:
             The updated entry record if found and owned by user, None otherwise
         """

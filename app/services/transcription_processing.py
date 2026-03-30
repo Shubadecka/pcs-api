@@ -55,8 +55,6 @@ Example:
 ]"""
         logger.debug("Calling response model to split page (prompt_len=%d)", len(prompt))
         split_response = await ollama.generate(prompt)
-        print(f"split prompt: {prompt}")
-        print(f"split_response: {split_response}")
         return split_response
 
     @staticmethod

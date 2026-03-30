@@ -26,7 +26,9 @@ class EntryService(IEntryService):
         start_date: date | None = None,
         end_date: date | None = None,
         page: int = 1,
-        limit: int = 50
+        limit: int = 50,
+        sort_by: str = "entry_date",
+        filter_field: str = "entry_date",
     ) -> tuple[list[dict[str, Any]], int]:
         """Get all entries for a user with optional filtering."""
         # Validate pagination parameters
@@ -36,13 +38,15 @@ class EntryService(IEntryService):
             limit = 1
         if limit > 100:
             limit = 100  # Cap at 100 for performance
-        
+
         entries, total = await self.entry_repository.get_all(
             user_id=user_id,
             start_date=start_date,
             end_date=end_date,
             page=page,
-            limit=limit
+            limit=limit,
+            sort_by=sort_by,
+            filter_field=filter_field,
         )
         
         # Transform entries for API response
@@ -90,23 +94,19 @@ class EntryService(IEntryService):
         entry_id: UUID,
         user_id: UUID,
         entry_date: date | None = None,
-        raw_ocr_transcription: str | None = None,
         improved_transcription: str | None = None,
-        agent_has_improved: bool | None = None,
     ) -> dict[str, Any]:
-        """Update an entry."""
+        """Update an entry's user-editable fields."""
         # Check if entry exists and is owned by user
         if not await self.entry_repository.exists(entry_id, user_id):
             raise ValueError("Entry not found")
-        
+
         # Update the entry
         entry = await self.entry_repository.update(
             entry_id=entry_id,
             user_id=user_id,
             entry_date=entry_date,
-            raw_ocr_transcription=raw_ocr_transcription,
             improved_transcription=improved_transcription,
-            agent_has_improved=agent_has_improved,
         )
         
         if entry is None:

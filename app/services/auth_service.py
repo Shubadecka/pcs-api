@@ -91,20 +91,18 @@ class AuthService(IAuthService):
     
     async def login(
         self,
-        email: str,
+        username: str,
         password: str
     ) -> tuple[dict[str, Any], str]:
         """Authenticate a user."""
-        # Get user by email (includes password_hash and salt)
-        user = await self.user_repository.get_by_email(email)
+        user = await self.user_repository.get_by_username(username)
         
         if user is None:
-            # Use generic message to prevent email enumeration
-            raise ValueError("Invalid email or password")
+            raise ValueError("Invalid username or password")
         
         # Verify password
         if not verify_password(password, user["salt"], user["password_hash"]):
-            raise ValueError("Invalid email or password")
+            raise ValueError("Invalid username or password")
         
         # Generate JWT token
         token = create_jwt_token(user["id"])

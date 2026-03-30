@@ -36,13 +36,13 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     """Schema for user login request."""
     
-    email: EmailStr = Field(..., description="User's email address")
+    username: str = Field(..., description="User's username")
     password: str = Field(..., description="User's password")
     
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "email": "user@example.com",
+                "username": "johndoe",
                 "password": "securepassword123"
             }
         }

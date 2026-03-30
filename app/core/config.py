@@ -55,6 +55,8 @@ class Settings(BaseSettings):
     
     # Agentic cleanup settings
     agent_max_iterations: int = 10
+    agent_context_size: int = 8192
+    agent_batch_size: int = 64
 
     # CORS settings
     cors_origins: list[str] = ["http://localhost:5173", "http://localhost:3001"]

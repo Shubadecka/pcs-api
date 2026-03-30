@@ -66,7 +66,7 @@ async def register(
         key="access_token",
         value=token,
         httponly=True,
-        secure=True,  # Set to False in development if not using HTTPS
+        secure=False,  # Set to False in development if not using HTTPS
         samesite="lax",
         max_age=60 * 60 * 24  # 24 hours
     )
@@ -84,7 +84,7 @@ async def register(
     response_model=AuthResponse,
     summary="Log in a user",
     responses={
-        401: {"description": "Invalid email or password"},
+        401: {"description": "Invalid username or password"},
     }
 )
 async def login(
@@ -95,12 +95,12 @@ async def login(
     """
     Log in an existing user.
     
-    Authenticates user with email and password.
+    Authenticates user with username and password.
     Returns user information and sets an httpOnly JWT cookie.
     """
     try:
         user, token = await auth_service.login(
-            email=request.email,
+            username=request.username,
             password=request.password
         )
     except ValueError as e:

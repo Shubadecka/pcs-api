@@ -91,9 +91,6 @@ class OllamaClient:
                 logger.info("Generate completed (%d chars)", len(result))
             else:
                 logger.warning("Generate returned empty response")
-                logger.warning(f"payload: {payload}")
-                out_response = {k: v for k, v in data.items() if k != 'context'}
-                logger.warning(f"Response: {out_response}")
             return result
         except Exception as exc:
             logger.warning("Generate failed: %s: %s", type(exc).__name__, exc)
@@ -126,6 +123,10 @@ class OllamaClient:
                 "model": settings.response_model,
                 "messages": messages,
                 "stream": False,
+                "options": {
+                    "num_ctx": settings.agent_context_size,
+                    "num_batch": settings.agent_batch_size,
+                },
             }
             if tools:
                 payload["tools"] = tools

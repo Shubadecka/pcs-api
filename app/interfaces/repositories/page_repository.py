@@ -15,7 +15,8 @@ class IPageRepository(ABC):
         user_id: UUID,
         image_path: str,
         uploaded_date: date,
-        notes: str | None = None
+        page_start_date: date | None = None,
+        notes: str | None = None,
     ) -> dict[str, Any]:
         """
         Create a new page record.

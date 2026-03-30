@@ -17,7 +17,8 @@ class IPageService(ABC):
         user_id: UUID,
         image: UploadFile,
         uploaded_date: date,
-        notes: str | None = None
+        page_start_date: date | None = None,
+        notes: str | None = None,
     ) -> dict[str, Any]:
         """
         Upload a new page image.

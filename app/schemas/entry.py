@@ -40,20 +40,22 @@ class EntryResponse(BaseModel):
 
 
 class EntryUpdate(BaseModel):
-    """Schema for entry update request."""
-    
+    """Schema for entry update request.
+
+    Only user-editable fields are exposed. `raw_ocr_transcription` is
+    immutable after creation and `agent_has_improved` is managed exclusively
+    by the agentic cleanup pipeline — neither can be set via this endpoint.
+    """
+
     entry_date: date | None = Field(None, alias="date", description="New journal entry date")
-    raw_ocr_transcription: str | None = Field(None, description="New raw OCR transcription text")
-    improved_transcription: str | None = Field(None, description="New agent-improved transcription text")
-    agent_has_improved: bool | None = Field(None, description="Whether the agent has improved the transcription")
-    
+    improved_transcription: str | None = Field(None, description="User-edited transcription text")
+
     model_config = ConfigDict(
         populate_by_name=True,
         json_schema_extra={
             "example": {
                 "date": "2024-01-16",
-                "raw_ocr_transcription": "Updated raw transcription text...",
-                "improved_transcription": "Updated improved transcription text..."
+                "improved_transcription": "Updated transcription text..."
             }
         }
     )
