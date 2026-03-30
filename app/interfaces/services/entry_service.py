@@ -60,20 +60,23 @@ class IEntryService(ABC):
         entry_id: UUID,
         user_id: UUID,
         entry_date: date | None = None,
-        transcription: str | None = None
+        improved_transcription: str | None = None,
     ) -> dict[str, Any]:
         """
-        Update an entry.
-        
+        Update an entry's user-editable fields.
+
+        `raw_ocr_transcription` is immutable after creation.
+        `agent_has_improved` is managed exclusively by the agentic cleanup pipeline.
+
         Args:
             entry_id: The entry's UUID
             user_id: The user's UUID
             entry_date: Optional new entry date
-            transcription: Optional new transcription
-            
+            improved_transcription: Optional user-edited transcription text
+
         Returns:
             The updated entry record
-            
+
         Raises:
             ValueError: If entry not found or not owned by user
         """

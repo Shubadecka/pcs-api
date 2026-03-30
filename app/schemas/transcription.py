@@ -8,7 +8,7 @@ class ParsedEntry(BaseModel):
     """A single journal entry parsed from raw OCR text."""
 
     entry_date: date = Field(..., description="The date this entry was written")
-    transcription: str = Field(..., description="The transcribed text for this entry")
+    raw_ocr_transcription: str = Field(..., description="The raw OCR transcribed text for this entry")
     embedding: list[float] | None = Field(None, description="Vector embedding of the transcription")
 
 

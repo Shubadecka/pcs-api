@@ -4,7 +4,7 @@ from datetime import date
 from uuid import UUID
 from typing import Any
 
-from sqlalchemy import select, update, delete, exists
+from sqlalchemy import select, update, delete, exists, nulls_last
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.interfaces.repositories.page_repository import IPageRepository
@@ -30,7 +30,8 @@ class PageRepository(IPageRepository):
         user_id: UUID,
         image_path: str,
         uploaded_date: date,
-        notes: str | None = None
+        page_start_date: date | None = None,
+        notes: str | None = None,
     ) -> dict[str, Any]:
         """Create a new page record."""
         stmt = (
@@ -39,6 +40,7 @@ class PageRepository(IPageRepository):
                 user_id=user_id,
                 image_path=image_path,
                 uploaded_date=uploaded_date,
+                page_start_date=page_start_date,
                 notes=notes,
                 page_status="pending"
             )
@@ -150,9 +152,11 @@ class PageRepository(IPageRepository):
         self,
         user_id: UUID,
         start_date: date | None = None,
-        end_date: date | None = None
+        end_date: date | None = None,
+        sort_by: str = "page_start_date",
+        filter_field: str = "page_start_date",
     ) -> list[dict[str, Any]]:
-        """Get all pages for a user, with optional written-date range overlap filter."""
+        """Get all pages for a user, with optional date range filter."""
         stmt = select(
             pages.c.id,
             pages.c.user_id,
@@ -165,13 +169,24 @@ class PageRepository(IPageRepository):
             pages.c.created_at
         ).where(pages.c.user_id == user_id)
 
-        if start_date and end_date:
-            stmt = stmt.where(
-                pages.c.page_start_date <= end_date,
-                pages.c.page_end_date >= start_date,
-            )
+        if filter_field == "uploaded_date":
+            if start_date:
+                stmt = stmt.where(pages.c.uploaded_date >= start_date)
+            if end_date:
+                stmt = stmt.where(pages.c.uploaded_date <= end_date)
+        else:
+            # Written-date overlap filter (requires both bounds)
+            if start_date and end_date:
+                stmt = stmt.where(
+                    pages.c.page_start_date <= end_date,
+                    pages.c.page_end_date >= start_date,
+                )
 
-        stmt = stmt.order_by(pages.c.uploaded_date.desc())
+        if sort_by == "uploaded_date":
+            stmt = stmt.order_by(pages.c.uploaded_date.desc())
+        else:
+            stmt = stmt.order_by(nulls_last(pages.c.page_start_date.desc()))
+
         result = await self.db.execute(stmt)
         return [dict(r._mapping) for r in result.fetchall()]
 

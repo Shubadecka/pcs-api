@@ -34,14 +34,14 @@ class IAuthService(ABC):
     @abstractmethod
     async def login(
         self,
-        email: str,
+        username: str,
         password: str
     ) -> tuple[dict[str, Any], str]:
         """
         Authenticate a user.
         
         Args:
-            email: User's email address
+            username: User's username
             password: User's plain text password
             
         Returns:

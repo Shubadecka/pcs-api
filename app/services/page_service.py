@@ -45,7 +45,8 @@ class PageService(IPageService):
         user_id: UUID,
         image: UploadFile,
         uploaded_date: date,
-        notes: str | None = None
+        page_start_date: date | None = None,
+        notes: str | None = None,
     ) -> dict[str, Any]:
         """Upload a new page image."""
         # Validate file
@@ -89,6 +90,7 @@ class PageService(IPageService):
             user_id=user_id,
             image_path=relative_path,
             uploaded_date=uploaded_date,
+            page_start_date=page_start_date,
             notes=notes,
         )
 
@@ -151,7 +153,8 @@ class PageService(IPageService):
                 user_id=user_id,
                 page_id=page_id,
                 entry_date=parsed_entry.entry_date,
-                transcription=parsed_entry.transcription,
+                raw_ocr_transcription=parsed_entry.raw_ocr_transcription,
+                embedding=parsed_entry.embedding,
             )
             created_entries.append(entry)
 
@@ -265,10 +268,14 @@ class PageService(IPageService):
         self,
         user_id: UUID,
         start_date: date | None = None,
-        end_date: date | None = None
+        end_date: date | None = None,
+        sort_by: str = "page_start_date",
+        filter_field: str = "page_start_date",
     ) -> list[dict[str, Any]]:
-        """Get all pages for a user, with optional written-date range filter."""
-        pages = await self.page_repository.get_all_by_user(user_id, start_date, end_date)
+        """Get all pages for a user, with optional date range filter."""
+        pages = await self.page_repository.get_all_by_user(
+            user_id, start_date, end_date, sort_by=sort_by, filter_field=filter_field
+        )
         return [
             {
                 "id": p["id"],

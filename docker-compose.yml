@@ -38,6 +38,7 @@ services:
       OCR_MODEL: ${OCR_MODEL:-}
       RESPONSE_MODEL: ${RESPONSE_MODEL:-}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-}
+      EMBEDDING_DIM: ${EMBEDDING_DIM:-1024}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:

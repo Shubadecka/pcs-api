@@ -39,19 +39,26 @@ async def get_entries(
     startDate: date | None = Query(None, description="Filter by start date (inclusive)"),
     endDate: date | None = Query(None, description="Filter by end date (inclusive)"),
     page: int = Query(1, ge=1, description="Page number"),
-    limit: int = Query(50, ge=1, le=100, description="Items per page")
+    limit: int = Query(50, ge=1, le=100, description="Items per page"),
+    sortBy: str = Query("date_written", description="Sort field: 'date_written' or 'date_uploaded'"),
+    filterField: str = Query("date_written", description="Filter field: 'date_written' or 'date_uploaded'"),
 ):
     """
     Get all entries for the current user.
     
-    Supports optional date filtering and pagination.
+    Supports optional date filtering, sorting, and pagination.
     """
+    sort_by_col = "created_at" if sortBy == "date_uploaded" else "entry_date"
+    filter_field_col = "created_at" if filterField == "date_uploaded" else "entry_date"
+
     entries, total = await entry_service.get_entries(
         user_id=user_id,
         start_date=startDate,
         end_date=endDate,
         page=page,
-        limit=limit
+        limit=limit,
+        sort_by=sort_by_col,
+        filter_field=filter_field_col,
     )
     
     return EntryListResponse(
@@ -59,7 +66,9 @@ async def get_entries(
             EntryResponse(
                 id=entry["id"],
                 date=entry["entry_date"],
-                transcription=entry["transcription"],
+                raw_ocr_transcription=entry["raw_ocr_transcription"],
+                improved_transcription=entry["improved_transcription"],
+                agent_has_improved=entry["agent_has_improved"],
                 page_id=entry["page_id"],
                 createdAt=entry["created_at"],
                 updatedAt=entry["updated_at"],
@@ -101,7 +110,9 @@ async def get_entry(
         entry=EntryResponse(
             id=entry["id"],
             date=entry["entry_date"],
-            transcription=entry["transcription"],
+            raw_ocr_transcription=entry["raw_ocr_transcription"],
+            improved_transcription=entry["improved_transcription"],
+            agent_has_improved=entry["agent_has_improved"],
             page_id=entry["page_id"],
             createdAt=entry["created_at"],
             updatedAt=entry["updated_at"],
@@ -137,7 +148,7 @@ async def update_entry(
             entry_id=entry_id,
             user_id=user_id,
             entry_date=request.entry_date,
-            transcription=request.transcription
+            improved_transcription=request.improved_transcription,
         )
     except ValueError as e:
         raise HTTPException(
@@ -149,7 +160,9 @@ async def update_entry(
         entry=EntryResponse(
             id=entry["id"],
             date=entry["entry_date"],
-            transcription=entry["transcription"],
+            raw_ocr_transcription=entry["raw_ocr_transcription"],
+            improved_transcription=entry["improved_transcription"],
+            agent_has_improved=entry["agent_has_improved"],
             page_id=entry["page_id"],
             createdAt=entry["created_at"],
             updatedAt=entry["updated_at"],

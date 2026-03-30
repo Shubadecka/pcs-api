@@ -37,9 +37,10 @@ def get_page_service(db: DbSession) -> PageService:
 async def upload_page(
     user_id: CurrentUserId,
     image: UploadFile = File(..., description="Image file (jpg, png, gif, webp)"),
-    date: date = Form(..., description="Journal page date (YYYY-MM-DD)"),
+    date: date = Form(..., description="Upload date (YYYY-MM-DD)"),
+    page_start_date: date | None = Form(None, alias="pageStartDate", description="Page start date (YYYY-MM-DD)"),
     notes: str | None = Form(None, description="Optional notes about the page"),
-    page_service: PageService = Depends(get_page_service)
+    page_service: PageService = Depends(get_page_service),
 ):
     """
     Upload a new journal page image.
@@ -52,7 +53,8 @@ async def upload_page(
             user_id=user_id,
             image=image,
             uploaded_date=date,
-            notes=notes
+            page_start_date=page_start_date,
+            notes=notes,
         )
     except ValueError as e:
         error_msg = str(e)
@@ -91,20 +93,28 @@ async def upload_page(
 async def list_pages(
     user_id: CurrentUserId,
     page_service: PageService = Depends(get_page_service),
-    start_date: date | None = Query(None, alias="startDate", description="Filter start date (written date, YYYY-MM-DD)"),
-    end_date: date | None = Query(None, alias="endDate", description="Filter end date (written date, YYYY-MM-DD)"),
+    start_date: date | None = Query(None, alias="startDate", description="Filter start date (YYYY-MM-DD)"),
+    end_date: date | None = Query(None, alias="endDate", description="Filter end date (YYYY-MM-DD)"),
+    sortBy: str = Query("date_written", description="Sort field: 'date_written' or 'date_uploaded'"),
+    filterField: str = Query("date_written", description="Filter field: 'date_written' or 'date_uploaded'"),
 ):
     """
     List all pages for the current user.
 
-    Optionally filter by written date range using startDate and endDate.
-    Only pages whose written date range overlaps with the filter range are returned.
-    Pages without a written date (status 'pending') are excluded when a filter is active.
+    Optionally filter by date range. When filterField is 'date_written', filters by
+    written-date overlap (both bounds required). When filterField is 'date_uploaded',
+    filters by uploaded_date. Default sort is by written date (page_start_date) with
+    pages lacking a written date sorted last.
     """
+    sort_by_col = "uploaded_date" if sortBy == "date_uploaded" else "page_start_date"
+    filter_field_col = "uploaded_date" if filterField == "date_uploaded" else "page_start_date"
+
     pages = await page_service.get_all_pages(
         user_id=user_id,
         start_date=start_date,
         end_date=end_date,
+        sort_by=sort_by_col,
+        filter_field=filter_field_col,
     )
     return PageListResponse(
         pages=[
@@ -221,7 +231,9 @@ async def process_page(
             EntryResponse(
                 id=e["id"],
                 date=e["entry_date"],
-                transcription=e["transcription"],
+                raw_ocr_transcription=e["raw_ocr_transcription"],
+                improved_transcription=e["improved_transcription"],
+                agent_has_improved=e["agent_has_improved"],
                 page_id=e["page_id"],
                 createdAt=e["created_at"],
                 updatedAt=e["updated_at"],

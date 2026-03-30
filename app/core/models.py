@@ -4,6 +4,7 @@ from datetime import datetime, date
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, ConfigDict
+from app.core.config import settings
 from sqlalchemy import (
     MetaData,
     Table,
@@ -12,12 +13,14 @@ from sqlalchemy import (
     Text,
     Date,
     DateTime,
+    Boolean,
     ForeignKey,
     CheckConstraint,
     Index,
     func,
 )
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from pgvector.sqlalchemy import Vector
 
 
 # =============================================================================
@@ -95,7 +98,10 @@ entries = Table(
     Column("user_id", PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
     Column("page_id", PG_UUID(as_uuid=True), ForeignKey("pages.id", ondelete="CASCADE"), nullable=False),
     Column("entry_date", Date, nullable=False),
-    Column("transcription", Text, nullable=False),
+    Column("raw_ocr_transcription", Text, nullable=False),
+    Column("improved_transcription", Text, nullable=True),
+    Column("agent_has_improved", Boolean, nullable=False, server_default="false"),
+    Column("embedding", Vector(settings.embedding_dim), nullable=True),
     Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()),
     
@@ -103,6 +109,24 @@ entries = Table(
     Index("idx_entries_user_id", "user_id"),
     Index("idx_entries_user_entry_date", "user_id", "entry_date"),
     Index("idx_entries_page_id", "page_id"),
+)
+
+
+# Transcription learnings table
+transcription_learnings = Table(
+    "transcription_learnings",
+    metadata,
+    Column("id", PG_UUID(as_uuid=True), primary_key=True, default=uuid4),
+    Column("user_id", PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+    Column("entry_id", PG_UUID(as_uuid=True), ForeignKey("entries.id", ondelete="CASCADE"), nullable=False),
+    Column("learning_date", Date, nullable=False),
+    Column("learning_text", Text, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+
+    # Indexes
+    Index("idx_transcription_learnings_user_id", "user_id"),
+    Index("idx_transcription_learnings_entry_id", "entry_id"),
+    Index("idx_transcription_learnings_user_learning_date", "user_id", "learning_date"),
 )
 
 
@@ -169,7 +193,10 @@ class EntryModel(BaseModel):
     user_id: UUID = Field(..., description="Owner's UUID")
     page_id: UUID = Field(..., description="Associated page's UUID")
     entry_date: date = Field(..., description="Journal entry date")
-    transcription: str = Field(..., description="Transcribed text")
+    raw_ocr_transcription: str = Field(..., description="Raw OCR transcribed text")
+    improved_transcription: str | None = Field(None, description="Agent-improved transcription")
+    agent_has_improved: bool = Field(default=False, description="Whether the agent has improved the transcription")
+    embedding: list[float] | None = Field(None, description="Vector embedding of the transcription")
     created_at: datetime = Field(default_factory=datetime.now, description="Entry creation timestamp")
     updated_at: datetime = Field(default_factory=datetime.now, description="Last modification timestamp")
     
@@ -220,11 +247,36 @@ class EntryCreate(BaseModel):
     user_id: UUID
     page_id: UUID
     entry_date: date
-    transcription: str
+    raw_ocr_transcription: str
+    embedding: list[float] | None = None
 
 
 class EntryUpdate(BaseModel):
     """Pydantic model for updating an entry."""
     
     entry_date: date | None = None
-    transcription: str | None = None
+    raw_ocr_transcription: str | None = None
+    improved_transcription: str | None = None
+    agent_has_improved: bool | None = None
+
+
+class TranscriptionLearningModel(BaseModel):
+    """Pydantic model for transcription_learnings database records."""
+
+    id: UUID = Field(default_factory=uuid4, description="Unique learning identifier")
+    user_id: UUID = Field(..., description="Owner's UUID")
+    entry_id: UUID = Field(..., description="Associated entry's UUID")
+    learning_date: date = Field(..., description="Date the learning was recorded")
+    learning_text: str = Field(..., description="The learning text")
+    created_at: datetime = Field(default_factory=datetime.now, description="Record creation timestamp")
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TranscriptionLearningCreate(BaseModel):
+    """Pydantic model for creating a new transcription learning."""
+
+    user_id: UUID
+    entry_id: UUID
+    learning_date: date
+    learning_text: str
