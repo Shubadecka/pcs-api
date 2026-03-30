@@ -45,10 +45,13 @@ class EntryRepository(IEntryRepository):
         limit: int = 50,
         sort_by: str = "entry_date",
         filter_field: str = "entry_date",
+        page_id: UUID | None = None,
     ) -> tuple[list[dict[str, Any]], int]:
         """Get all entries for a user with optional filtering."""
-        # Build filter conditions
         conditions = [entries.c.user_id == user_id]
+
+        if page_id is not None:
+            conditions.append(entries.c.page_id == page_id)
 
         filter_col = entries.c.created_at if filter_field == "created_at" else entries.c.entry_date
 
@@ -57,25 +60,22 @@ class EntryRepository(IEntryRepository):
 
         if end_date is not None:
             conditions.append(filter_col <= end_date)
-        
-        # Combine conditions with AND
+
         where_clause = and_(*conditions)
-        
-        # Get total count
+
         count_stmt = select(func.count()).select_from(entries).where(where_clause)
         total_result = await self.db.execute(count_stmt)
         total = total_result.scalar() or 0
-        
-        # Calculate offset
+
         offset = (page - 1) * limit
 
-        # Determine sort order
-        if sort_by == "created_at":
+        if page_id is not None:
+            order = (entries.c.entry_date.asc(), entries.c.created_at.asc())
+        elif sort_by == "created_at":
             order = (entries.c.created_at.desc(), entries.c.entry_date.desc())
         else:
             order = (entries.c.entry_date.desc(), entries.c.created_at.desc())
-        
-        # Get paginated entries
+
         stmt = (
             select(
                 entries.c.id,
@@ -93,10 +93,10 @@ class EntryRepository(IEntryRepository):
             .limit(limit)
             .offset(offset)
         )
-        
+
         result = await self.db.execute(stmt)
         rows = result.fetchall()
-        
+
         return [dict(row._mapping) for row in rows], total
     
     async def get_by_id(

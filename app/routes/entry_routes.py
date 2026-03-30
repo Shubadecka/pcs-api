@@ -42,11 +42,14 @@ async def get_entries(
     limit: int = Query(50, ge=1, le=100, description="Items per page"),
     sortBy: str = Query("date_written", description="Sort field: 'date_written' or 'date_uploaded'"),
     filterField: str = Query("date_written", description="Filter field: 'date_written' or 'date_uploaded'"),
+    pageId: UUID | None = Query(None, description="Filter entries belonging to a specific page"),
 ):
     """
     Get all entries for the current user.
-    
+
     Supports optional date filtering, sorting, and pagination.
+    When `pageId` is provided, returns only entries for that page sorted
+    ascending by entry date.
     """
     sort_by_col = "created_at" if sortBy == "date_uploaded" else "entry_date"
     filter_field_col = "created_at" if filterField == "date_uploaded" else "entry_date"
@@ -59,6 +62,7 @@ async def get_entries(
         limit=limit,
         sort_by=sort_by_col,
         filter_field=filter_field_col,
+        page_id=pageId,
     )
     
     return EntryListResponse(

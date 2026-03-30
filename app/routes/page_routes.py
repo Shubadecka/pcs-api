@@ -1,5 +1,7 @@
 """Page route handlers."""
 
+import json
+import logging
 from datetime import date
 from uuid import UUID
 
@@ -12,6 +14,7 @@ from app.repositories.page_repository import PageRepository
 from app.repositories.entry_repository import EntryRepository
 from app.services.page_service import PageService
 
+logger = logging.getLogger("page_routes")
 
 router = APIRouter(prefix="/pages", tags=["Pages"])
 
@@ -24,61 +27,96 @@ def get_page_service(db: DbSession) -> PageService:
 
 
 @router.post(
-    "",
-    response_model=SinglePageResponse,
+    "/batch",
+    response_model=PageListResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Upload a new page",
+    summary="Upload page images (batch)",
     responses={
-        400: {"description": "Invalid image or missing required fields"},
+        400: {"description": "Invalid image, missing fields, or metadata mismatch"},
         401: {"description": "Not authenticated"},
         413: {"description": "File too large"},
     }
 )
-async def upload_page(
+async def upload_pages_batch(
     user_id: CurrentUserId,
-    image: UploadFile = File(..., description="Image file (jpg, png, gif, webp)"),
-    date: date = Form(..., description="Upload date (YYYY-MM-DD)"),
-    page_start_date: date | None = Form(None, alias="pageStartDate", description="Page start date (YYYY-MM-DD)"),
-    notes: str | None = Form(None, description="Optional notes about the page"),
+    images: list[UploadFile] = File(..., description="One or more image files (jpg, png, gif, webp)"),
+    date: date = Form(..., description="Shared upload date (YYYY-MM-DD)"),
+    metadata: str = Form("[]", description='JSON array of per-file metadata, e.g. [{"pageStartDate":"2024-01-01"},{}]'),
     page_service: PageService = Depends(get_page_service),
 ):
     """
-    Upload a new journal page image.
-    
-    Creates a page record with status 'pending'.
-    Entries are created later when the page is transcribed.
+    Upload one or more journal page images in a single request.
+
+    Each image is paired with its metadata entry by index. The metadata
+    JSON array must be the same length as the number of uploaded files
+    (or empty `[]` to default every start date to null).
     """
     try:
-        page = await page_service.upload_page(
+        parsed_meta = json.loads(metadata)
+    except json.JSONDecodeError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"message": "metadata must be valid JSON"},
+        )
+
+    if not isinstance(parsed_meta, list):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"message": "metadata must be a JSON array"},
+        )
+
+    # Pad metadata to match file count when caller sends []
+    if len(parsed_meta) == 0:
+        parsed_meta = [{}] * len(images)
+
+    page_start_dates: list[date | None] = []
+    for item in parsed_meta:
+        raw = item.get("pageStartDate") if isinstance(item, dict) else None
+        if raw:
+            try:
+                page_start_dates.append(date.fromisoformat(raw))
+            except (ValueError, TypeError):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={"message": f"Invalid date in metadata: {raw}"},
+                )
+        else:
+            page_start_dates.append(None)
+
+    try:
+        pages = await page_service.upload_pages_batch(
             user_id=user_id,
-            image=image,
+            images=images,
             uploaded_date=date,
-            page_start_date=page_start_date,
-            notes=notes,
+            page_start_dates=page_start_dates,
         )
     except ValueError as e:
         error_msg = str(e)
         if "too large" in error_msg.lower():
             raise HTTPException(
                 status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                detail={"message": error_msg}
+                detail={"message": error_msg},
             )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"message": error_msg}
+            detail={"message": error_msg},
         )
-    
-    return SinglePageResponse(
-        page=PageResponse(
-            id=page["id"],
-            imageUrl=page["image_url"],
-            date=page["uploaded_date"],
-            page_start_date=page["page_start_date"],
-            page_end_date=page["page_end_date"],
-            notes=page["notes"],
-            status=page["page_status"],
-            createdAt=page["created_at"]
-        )
+
+    return PageListResponse(
+        pages=[
+            PageResponse(
+                id=p["id"],
+                imageUrl=p["image_url"],
+                date=p["uploaded_date"],
+                page_start_date=p["page_start_date"],
+                page_end_date=p["page_end_date"],
+                notes=p["notes"],
+                status=p["page_status"],
+                createdAt=p["created_at"],
+            )
+            for p in pages
+        ],
+        total=len(pages),
     )
 
 
@@ -260,16 +298,17 @@ async def update_page(
     page_service: PageService = Depends(get_page_service)
 ):
     """
-    Update a page's start date.
+    Update a page's editable fields.
 
-    Only `page_start_date` can be updated via this endpoint. This represents
-    the date of the first journal entry on the page, not the upload date.
+    Both `page_start_date` and `notes` are optional; only provided fields
+    are changed.
     """
     try:
         page = await page_service.update_page(
             page_id=page_id,
             user_id=user_id,
             page_start_date=body.page_start_date,
+            notes=body.notes,
         )
     except ValueError as e:
         raise HTTPException(

@@ -40,61 +40,48 @@ class PageService(IPageService):
         self.page_repository = page_repository
         self.entry_repository = entry_repository
     
-    async def upload_page(
+    async def _save_single_image(
         self,
         user_id: UUID,
         image: UploadFile,
         uploaded_date: date,
         page_start_date: date | None = None,
-        notes: str | None = None,
     ) -> dict[str, Any]:
-        """Upload a new page image."""
-        # Validate file
+        """Validate, save one image to disk, and insert its page row."""
         if image.filename is None:
             raise ValueError("No image file provided")
-        
-        # Get file extension
+
         _, ext = os.path.splitext(image.filename)
         ext = ext.lower()
-        
+
         if ext not in ALLOWED_EXTENSIONS:
             raise ValueError(f"Invalid image format. Allowed: {', '.join(ALLOWED_EXTENSIONS)}")
-        
-        # Check file size (read in chunks to avoid memory issues)
+
         content = await image.read()
         if len(content) > settings.max_upload_size:
             raise ValueError(f"File too large. Maximum size: {settings.max_upload_size // (1024 * 1024)}MB")
-        
-        # Reset file position for saving
+
         await image.seek(0)
-        
-        # Generate unique filename
+
         unique_filename = f"{uuid.uuid4()}{ext}"
-        
-        # Create user's upload directory if it doesn't exist
+
         user_upload_dir = os.path.join(settings.upload_dir, str(user_id))
         os.makedirs(user_upload_dir, exist_ok=True)
-        
-        # Full path to save the file
+
         file_path = os.path.join(user_upload_dir, unique_filename)
-        
-        # Save the file
+
         async with aiofiles.open(file_path, "wb") as f:
             await f.write(content)
 
-        # Store relative path in database
         relative_path = f"{user_id}/{unique_filename}"
 
-        # Create page record (status: pending)
         page = await self.page_repository.create(
             user_id=user_id,
             image_path=relative_path,
             uploaded_date=uploaded_date,
             page_start_date=page_start_date,
-            notes=notes,
         )
 
-        # Transform for API response
         return {
             "id": page["id"],
             "image_url": self.get_image_url(page["image_path"]),
@@ -105,6 +92,54 @@ class PageService(IPageService):
             "page_status": page["page_status"],
             "created_at": page["created_at"],
         }
+
+    async def upload_page(
+        self,
+        user_id: UUID,
+        image: UploadFile,
+        uploaded_date: date,
+        page_start_date: date | None = None,
+    ) -> dict[str, Any]:
+        """Upload a single page image (legacy convenience wrapper)."""
+        return await self._save_single_image(
+            user_id=user_id,
+            image=image,
+            uploaded_date=uploaded_date,
+            page_start_date=page_start_date,
+        )
+
+    async def upload_pages_batch(
+        self,
+        user_id: UUID,
+        images: list[UploadFile],
+        uploaded_date: date,
+        page_start_dates: list[date | None],
+    ) -> list[dict[str, Any]]:
+        """Upload multiple page images in one batch.
+
+        Args:
+            images: List of uploaded image files.
+            uploaded_date: Shared upload date for every page.
+            page_start_dates: Per-file start dates aligned by index.
+        """
+        if not images:
+            raise ValueError("At least one image is required")
+        if len(images) != len(page_start_dates):
+            raise ValueError(
+                f"Number of images ({len(images)}) must match number of "
+                f"metadata entries ({len(page_start_dates)})"
+            )
+
+        pages: list[dict[str, Any]] = []
+        for image, start_date in zip(images, page_start_dates):
+            page = await self._save_single_image(
+                user_id=user_id,
+                image=image,
+                uploaded_date=uploaded_date,
+                page_start_date=start_date,
+            )
+            pages.append(page)
+        return pages
     
     async def process_page(
         self,
@@ -295,12 +330,14 @@ class PageService(IPageService):
         page_id: UUID,
         user_id: UUID,
         page_start_date: date | None = None,
+        notes: str | None = None,
     ) -> dict[str, Any]:
-        """Update a page's start date."""
-        page = await self.page_repository.update_dates(
+        """Update a page's editable fields (start date and/or notes)."""
+        page = await self.page_repository.update_fields(
             page_id=page_id,
             user_id=user_id,
             page_start_date=page_start_date,
+            notes=notes,
         )
 
         if page is None:
