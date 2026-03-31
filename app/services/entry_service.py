@@ -29,15 +29,15 @@ class EntryService(IEntryService):
         limit: int = 50,
         sort_by: str = "entry_date",
         filter_field: str = "entry_date",
+        page_id: UUID | None = None,
     ) -> tuple[list[dict[str, Any]], int]:
         """Get all entries for a user with optional filtering."""
-        # Validate pagination parameters
         if page < 1:
             page = 1
         if limit < 1:
             limit = 1
         if limit > 100:
-            limit = 100  # Cap at 100 for performance
+            limit = 100
 
         entries, total = await self.entry_repository.get_all(
             user_id=user_id,
@@ -47,6 +47,7 @@ class EntryService(IEntryService):
             limit=limit,
             sort_by=sort_by,
             filter_field=filter_field,
+            page_id=page_id,
         )
         
         # Transform entries for API response

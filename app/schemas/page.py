@@ -68,9 +68,10 @@ class ProcessPageResponse(BaseModel):
 
 
 class PageUpdateRequest(BaseModel):
-    """Schema for updating a page's start date."""
+    """Schema for updating a page's editable fields."""
 
     page_start_date: date | None = Field(None, description="Start date of the page (first entry date)")
+    notes: str | None = Field(None, description="Optional notes about the page")
 
 
 class PageListResponse(BaseModel):

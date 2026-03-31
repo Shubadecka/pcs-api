@@ -174,7 +174,7 @@ class TestUploadPage:
         with pytest.raises(ValueError, match="File too large"):
             await service.upload_page(user_id, upload, date(2024, 1, 15))
 
-    async def test_notes_are_forwarded_to_repository(self, user_id, page_id):
+    async def test_page_start_date_forwarded_to_repository(self, user_id, page_id):
         page = make_page(page_id, user_id)
         repo = make_repo(page=page)
         service = PageService(repo)
@@ -182,10 +182,10 @@ class TestUploadPage:
 
         patch_open, patch_makedirs = patch_file_io()
         with patch_open, patch_makedirs:
-            await service.upload_page(user_id, upload, date(2024, 1, 15), notes="My notes")
+            await service.upload_page(user_id, upload, date(2024, 1, 15), page_start_date=date(2024, 1, 10))
 
         _, kwargs = repo.create.call_args
-        assert kwargs["notes"] == "My notes"
+        assert kwargs["page_start_date"] == date(2024, 1, 10)
 
 
 # ---------------------------------------------------------------------------

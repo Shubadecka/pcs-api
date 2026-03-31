@@ -18,7 +18,6 @@ class IPageService(ABC):
         image: UploadFile,
         uploaded_date: date,
         page_start_date: date | None = None,
-        notes: str | None = None,
     ) -> dict[str, Any]:
         """
         Upload a new page image.
@@ -27,7 +26,7 @@ class IPageService(ABC):
             user_id: The user's UUID
             image: The uploaded image file
             uploaded_date: The date of upload
-            notes: Optional notes about the page
+            page_start_date: Optional start date for the page
             
         Returns:
             The created page record
@@ -150,14 +149,16 @@ class IPageService(ABC):
         page_id: UUID,
         user_id: UUID,
         page_start_date: date | None = None,
+        notes: str | None = None,
     ) -> dict[str, Any]:
         """
-        Update a page's start date.
+        Update a page's editable fields (start date and/or notes).
 
         Args:
             page_id: The page's UUID
             user_id: The user's UUID
             page_start_date: The new start date (or None to clear it)
+            notes: New notes text (or None to clear it)
 
         Returns:
             The updated page record

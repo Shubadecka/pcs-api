@@ -124,19 +124,21 @@ class IPageRepository(ABC):
         ...
 
     @abstractmethod
-    async def update_dates(
+    async def update_fields(
         self,
         page_id: UUID,
         user_id: UUID,
         page_start_date: date | None = None,
+        notes: str | None = None,
     ) -> dict[str, Any] | None:
         """
-        Update a page's start date without changing status or end date.
+        Update a page's editable fields (start date and/or notes).
 
         Args:
             page_id: The page's UUID
             user_id: The user's UUID (for ownership check)
             page_start_date: The new start date to set (or None to clear it)
+            notes: New notes text (or None to clear it)
 
         Returns:
             The updated page record if found and owned by user, None otherwise

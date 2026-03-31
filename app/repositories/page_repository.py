@@ -190,20 +190,33 @@ class PageRepository(IPageRepository):
         result = await self.db.execute(stmt)
         return [dict(r._mapping) for r in result.fetchall()]
 
-    async def update_dates(
+    async def update_fields(
         self,
         page_id: UUID,
         user_id: UUID,
-        page_start_date: date | None = None,
+        page_start_date: date | None = _UNSET,
+        notes: str | None = _UNSET,
     ) -> dict[str, Any] | None:
-        """Update a page's start date without touching status or end date."""
+        """Update a page's editable fields (start date and/or notes).
+
+        Only columns whose arguments differ from the _UNSET sentinel are
+        written; omitting an argument leaves that column unchanged.
+        """
+        values: dict = {}
+        if page_start_date is not _UNSET:
+            values["page_start_date"] = page_start_date
+        if notes is not _UNSET:
+            values["notes"] = notes
+        if not values:
+            return await self.get_by_id(page_id, user_id)
+
         stmt = (
             update(pages)
             .where(
                 pages.c.id == page_id,
                 pages.c.user_id == user_id
             )
-            .values(page_start_date=page_start_date)
+            .values(**values)
             .returning(
                 pages.c.id,
                 pages.c.user_id,
